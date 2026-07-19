@@ -7,6 +7,9 @@ import * as Sentry from "@sentry/nextjs";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Fail-fast de variables de entorno al arranque (B0.8).
+    const { validateEnv } = await import("./lib/env");
+    validateEnv();
     await import("../sentry.server.config");
   }
 

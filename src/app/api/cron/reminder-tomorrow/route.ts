@@ -1,5 +1,6 @@
 import { formatTime } from "@/lib/dates";
 import { sendPushToTenant } from "@/lib/push";
+import { constantTimeEqual } from "@/lib/timing-safe";
 import { listTenantsWithAppointmentsTomorrow } from "@/modules/appointments/repository";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET;
   const auth = request.headers.get("authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!secret || !constantTimeEqual(auth, `Bearer ${secret}`)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

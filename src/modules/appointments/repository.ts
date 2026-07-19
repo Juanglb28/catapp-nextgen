@@ -242,6 +242,31 @@ export async function listAppointmentsForAgenda(
 }
 
 /**
+ * ¿Hay al menos una cita `scheduled` en el rango? (B0.3). Para el badge "mañana"
+ * de /citas, que antes cargaba la agenda completa (2 queries con joins) solo para
+ * un booleano. Usa el índice parcial `appointments_scheduled_starts_idx`.
+ */
+export async function hasScheduledInRange(
+  tenantId: string,
+  start: Date,
+  end: Date,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ exists: sql<boolean>`true` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        eq(appointments.status, "scheduled"),
+        gte(appointments.startsAt, start),
+        lt(appointments.startsAt, end),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
+/**
  * Historial de citas de una clienta (orden descendente por inicio, paginado).
  * Devuelve `hasMore` para saber si hay otra página. Tenant-scoped.
  */

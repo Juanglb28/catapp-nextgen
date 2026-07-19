@@ -28,6 +28,9 @@ export async function sendAppointmentTemplate(
     templateName: params.templateName,
   });
 
+  // null = ya existía ese template para esta cita (idempotencia B0.2): no reenviar.
+  if (id === null) return { ok: false, reason: "already_queued" };
+
   try {
     const waMessageId = await sendTemplate(
       params.toPhone,

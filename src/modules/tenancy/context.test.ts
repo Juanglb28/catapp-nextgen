@@ -13,6 +13,8 @@ vi.mock("@/lib/auth", () => ({
 }));
 vi.mock("@/modules/tenancy/repository", () => ({
   getUserTenant: vi.fn(),
+  // context.ts importa getTenant para exponer getTenantCached (B0.3).
+  getTenant: vi.fn(),
 }));
 
 import { auth } from "@/lib/auth";

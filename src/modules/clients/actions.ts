@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { normalizePhoneCO } from "@/lib/phone";
+import { swallow } from "@/lib/swallow";
 import {
   fetchGoogleContacts,
   getAccessTokenForSettings,
@@ -147,8 +148,9 @@ export async function updateClientAction(
           await setClientBirthdayGcalEventId(tenantId, id, gcalId);
         }
       }
-    } catch {
-      // Falla silenciosa: no bloquear la actualización por GCal.
+    } catch (err) {
+      // No bloquear la actualización por un fallo de Google Calendar.
+      swallow(err, { module: "clients", op: "updateClient.gcalBirthday", tenantId });
     }
   }
 
@@ -220,8 +222,9 @@ export async function importContactsAction(
         try {
           await upsertBirthdayBonus(tenantId, client.id, todayYear);
           await sendBirthdayPushToTenant(tenantId, client.id);
-        } catch {
+        } catch (err) {
           // No bloquear importación por fallo de bono.
+          swallow(err, { module: "clients", op: "import.birthdayBonus", tenantId });
         }
       }
     } catch (e) {
@@ -305,8 +308,9 @@ export async function syncBirthdaysFromContactsAction(): Promise<
         await upsertBirthdayBonus(tenantId, client.id, todayYear);
         await sendBirthdayPushToTenant(tenantId, client.id);
         bonusFiredToday++;
-      } catch {
+      } catch (err) {
         // No bloquear sync por fallo de bono.
+        swallow(err, { module: "clients", op: "syncBirthdays.bonus", tenantId });
       }
     }
   }

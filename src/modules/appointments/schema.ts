@@ -104,7 +104,20 @@ export const appointments = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("appointments_tenant_starts_idx").on(t.tenantId, t.startsAt)],
+  (t) => [
+    index("appointments_tenant_starts_idx").on(t.tenantId, t.startsAt),
+    // Historial por clienta (ficha) y stats: filtra tenant+client, ordena por fecha desc. (B0.1)
+    index("appointments_tenant_client_starts_idx").on(
+      t.tenantId,
+      t.clientId,
+      t.startsAt.desc(),
+    ),
+    // Crons cross-tenant (recordatorios): barren por rango de starts_at solo de las
+    // agendadas. Índice parcial para no escanear completadas/canceladas. (B0.1)
+    index("appointments_scheduled_starts_idx")
+      .on(t.startsAt)
+      .where(sql`${t.status} = 'scheduled'`),
+  ],
 );
 
 /**
@@ -127,21 +140,31 @@ export const appointmentServices = pgTable(
 );
 
 /** Auditoría de cambios de una cita (RF-02): una fila por campo modificado. */
-export const appointmentChanges = pgTable("appointment_changes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  appointmentId: uuid("appointment_id")
-    .notNull()
-    .references(() => appointments.id, { onDelete: "cascade" }),
-  changedBy: text("changed_by").references(() => user.id, {
-    onDelete: "set null",
-  }),
-  changedAt: timestamp("changed_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  field: text("field").notNull(),
-  oldValue: text("old_value"),
-  newValue: text("new_value"),
-});
+export const appointmentChanges = pgTable(
+  "appointment_changes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    appointmentId: uuid("appointment_id")
+      .notNull()
+      .references(() => appointments.id, { onDelete: "cascade" }),
+    changedBy: text("changed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    changedAt: timestamp("changed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    field: text("field").notNull(),
+    oldValue: text("old_value"),
+    newValue: text("new_value"),
+  },
+  // Historial de cambios de una cita: se lee por appointment_id ordenado por fecha. (B0.1)
+  (t) => [
+    index("appointment_changes_appointment_idx").on(
+      t.appointmentId,
+      t.changedAt,
+    ),
+  ],
+);
 
 export type Appointment = typeof appointments.$inferSelect;
 export type NewAppointment = typeof appointments.$inferInsert;

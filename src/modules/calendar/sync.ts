@@ -1,3 +1,4 @@
+import { swallow } from "@/lib/swallow";
 import { getAppointment, setGcalSync } from "@/modules/appointments/repository";
 import { getTenant } from "@/modules/tenancy/repository";
 
@@ -152,7 +153,8 @@ export async function syncAppointment(
         gcalSyncStatus: "ok",
       });
     }
-  } catch {
+  } catch (err) {
+    swallow(err, { module: "calendar", op: "syncAppointment", tenantId });
     await setGcalSync(tenantId, appointmentId, { gcalSyncStatus: "error" });
   }
 }

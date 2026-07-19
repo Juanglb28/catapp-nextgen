@@ -10,10 +10,13 @@
  */
 import webPush from "web-push";
 
+import { getVapidConfig, isPushConfigured } from "@/lib/env";
 import {
   deletePushSubscription,
   getTenantPushSubscriptions,
 } from "@/modules/birthdays/repository";
+
+export { isPushConfigured };
 
 export interface PushPayload {
   title: string;
@@ -21,20 +24,10 @@ export interface PushPayload {
   url?: string;
 }
 
-export function isPushConfigured(): boolean {
-  return Boolean(
-    process.env.VAPID_PUBLIC_KEY &&
-    process.env.VAPID_PRIVATE_KEY &&
-    process.env.VAPID_SUBJECT,
-  );
-}
-
 function setupVapid() {
-  webPush.setVapidDetails(
-    process.env.VAPID_SUBJECT!,
-    process.env.VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!,
-  );
+  const vapid = getVapidConfig();
+  if (!vapid) return;
+  webPush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
 }
 
 /**

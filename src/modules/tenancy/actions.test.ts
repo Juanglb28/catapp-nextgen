@@ -7,6 +7,8 @@ vi.mock("@/lib/auth", () => ({ auth: { api: { getSession: vi.fn() } } }));
 vi.mock("@/modules/tenancy/repository", () => ({
   getUserTenant: vi.fn(),
   createTenantWithOwner: vi.fn(),
+  // context.ts (importado por las actions) usa getTenant para getTenantCached (B0.3).
+  getTenant: vi.fn(),
 }));
 vi.mock("@/modules/services/repository", () => ({
   createServices: vi.fn(),

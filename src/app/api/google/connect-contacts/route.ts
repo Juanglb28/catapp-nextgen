@@ -29,12 +29,14 @@ export async function GET(request: Request) {
   response.cookies.set("g_oauth_state", state, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 600,
     path: "/",
   });
   response.cookies.set("g_redirect_after", "/clientas/importar", {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 600,
     path: "/",
   });

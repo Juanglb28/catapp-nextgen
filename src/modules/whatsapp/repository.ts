@@ -69,6 +69,14 @@ const STATUS_RANK: Record<WaMessageStatus, number> = {
   failed: 99,
 };
 
+/**
+ * Encola un mensaje `queued`. Idempotente por (appointment_id, template_name)
+ * vía el unique de la tabla (B0.2): si ya existe ese template para esa cita,
+ * `onConflictDoNothing` no inserta y devuelve `null` (el llamador debe omitir el
+ * envío). Cierra la carrera del cron de recordatorios (QA B5): dos ejecuciones
+ * solapadas ya no duplican el envío, la garantía la da la DB, no el check previo.
+ * Los mensajes sin cita (`appointmentId` null) siempre insertan.
+ */
 export async function queueMessage(
   tenantId: string,
   data: {
@@ -76,8 +84,8 @@ export async function queueMessage(
     toPhone: string;
     templateName: string;
   },
-): Promise<string> {
-  const [row] = await db
+): Promise<string | null> {
+  const rows = await db
     .insert(waMessages)
     .values({
       tenantId,
@@ -86,8 +94,11 @@ export async function queueMessage(
       templateName: data.templateName,
       status: "queued",
     })
+    .onConflictDoNothing({
+      target: [waMessages.appointmentId, waMessages.templateName],
+    })
     .returning({ id: waMessages.id });
-  return row.id;
+  return rows[0]?.id ?? null;
 }
 
 export async function markSent(id: string, waMessageId: string): Promise<void> {

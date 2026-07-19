@@ -1,3 +1,5 @@
+import { constantTimeEqual } from "@/lib/timing-safe";
+import { swallow } from "@/lib/swallow";
 import { updateStatusByWaId } from "@/modules/whatsapp/messages";
 import type { WaMessageStatus } from "@/modules/whatsapp/schema";
 import { verifyWebhookSignature } from "@/modules/whatsapp/signature";
@@ -15,7 +17,7 @@ export async function GET(request: Request) {
   if (
     mode === "subscribe" &&
     verifyToken &&
-    token === verifyToken &&
+    constantTimeEqual(token, verifyToken) &&
     challenge
   ) {
     return new Response(challenge, { status: 200 });
@@ -70,8 +72,10 @@ export async function POST(request: Request) {
         }
       }
     }
-  } catch {
-    // Cuerpo inesperado: igual respondemos 200 para que Meta no reintente.
+  } catch (err) {
+    // Cuerpo inesperado: igual respondemos 200 para que Meta no reintente, pero
+    // dejamos rastro (antes se perdía en silencio — QA).
+    swallow(err, { module: "whatsapp", op: "webhook.parseBody" });
   }
 
   return new Response("OK", { status: 200 });

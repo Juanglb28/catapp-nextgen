@@ -6,6 +6,7 @@ import {
 } from "@/modules/whatsapp/reminders";
 import { listDueReminders } from "@/modules/whatsapp/repository";
 import { sendAppointmentTemplate } from "@/modules/whatsapp/send";
+import { constantTimeEqual } from "@/lib/timing-safe";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET;
   const auth = request.headers.get("authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!secret || !constantTimeEqual(auth, `Bearer ${secret}`)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

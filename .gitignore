@@ -12,6 +12,11 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+
+# temporales sueltos (B0.7)
+_tmp_*
 
 # next.js
 /.next/

@@ -73,6 +73,14 @@ export const waMessages = pgTable(
   (t) => [
     index("wa_messages_tenant_appointment_idx").on(t.tenantId, t.appointmentId),
     index("wa_messages_wa_message_id_idx").on(t.waMessageId),
+    // Idempotencia (B0.2): una cita no recibe el mismo template dos veces. Sirve
+    // además de índice para el NOT EXISTS del cron de recordatorios. Las filas con
+    // appointment_id NULL (mensajes sin cita) no colisionan: Postgres trata NULL
+    // como distinto, así que no bloquea envíos legítimos no ligados a una cita.
+    unique("wa_messages_appointment_template_unique").on(
+      t.appointmentId,
+      t.templateName,
+    ),
   ],
 );
 

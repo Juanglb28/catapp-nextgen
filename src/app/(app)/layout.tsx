@@ -5,14 +5,16 @@ import { OfflineBanner } from "@/components/offline-banner";
 import { PushManager } from "@/components/push-manager";
 import { SwUpdater } from "@/components/sw-updater";
 import { pendingBirthdayBonusCount } from "@/modules/birthdays/repository";
-import { requireTenant } from "@/modules/tenancy/context";
-import { getTenant } from "@/modules/tenancy/repository";
+import { getTenantCached, requireTenant } from "@/modules/tenancy/context";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   // Exige sesión + negocio: sin sesión -> /login, sin negocio -> /onboarding.
   const { tenantId } = await requireTenant();
-  const tenant = await getTenant(tenantId);
-  const birthdayCount = await pendingBirthdayBonusCount(tenantId);
+  // Paralelizado (B0.3): tenant y conteo de cumpleaños son independientes.
+  const [tenant, birthdayCount] = await Promise.all([
+    getTenantCached(tenantId),
+    pendingBirthdayBonusCount(tenantId),
+  ]);
 
   const name = tenant?.name ?? "CatApp";
   const initials = name

@@ -176,6 +176,13 @@
       "when": 1784349700683,
       "tag": "0024_app_lock_security",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1784501522605,
+      "tag": "0025_perf_indexes",
+      "breakpoints": true
     }
   ]
 }

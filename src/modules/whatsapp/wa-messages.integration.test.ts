@@ -44,6 +44,7 @@ describe.runIf(TEST_DB)("wa_messages (integración)", () => {
       toPhone: "573001112233",
       templateName: "recordatorio",
     });
+    if (!id) throw new Error("expected queued id");
     expect((await statusOf(id)).status).toBe("queued");
 
     await repo.markSent(id, "wamid.1");
@@ -66,6 +67,7 @@ describe.runIf(TEST_DB)("wa_messages (integración)", () => {
       toPhone: "573000000000",
       templateName: "recordatorio",
     });
+    if (!id) throw new Error("expected queued id");
     await repo.markFailed(id, "invalid_number");
     const row = await statusOf(id);
     expect(row.status).toBe("failed");
@@ -113,5 +115,52 @@ describe.runIf(TEST_DB)("wa_messages (integración)", () => {
     expect(await repo.hasMessage(tenantId, appt.id, "agradecimiento")).toBe(
       false,
     );
+  });
+
+  it("idempotencia por constraint: encolar 2× la misma cita+plantilla en paralelo crea 1 sola fila (QA B5)", async () => {
+    const repo = await import("./messages");
+    const clientsRepo = await import("@/modules/clients/repository");
+    const servicesRepo = await import("@/modules/services/repository");
+    const apptRepo = await import("@/modules/appointments/repository");
+
+    const clientId = (
+      await clientsRepo.createClient(tenantId, {
+        name: "Beatriz",
+        phone: "+573007778899",
+        email: null,
+        notes: null,
+      })
+    ).id;
+    const serviceId = (
+      await servicesRepo.createService(tenantId, {
+        name: "Pedicure",
+        basePriceCop: 20000n,
+        durationMin: 60,
+      })
+    ).id;
+    const appt = await apptRepo.createAppointment(tenantId, {
+      clientId,
+      startsAt: new Date("2026-10-01T15:00:00Z"),
+      endsAt: new Date("2026-10-01T16:00:00Z"),
+      services: [{ serviceId, priceCop: 20000n, quantity: 1 }],
+    });
+
+    // Dos ejecuciones solapadas del cron intentan encolar a la vez.
+    const [a, b] = await Promise.all([
+      repo.queueMessage(tenantId, {
+        appointmentId: appt.id,
+        toPhone: "573007778899",
+        templateName: "recordatorio",
+      }),
+      repo.queueMessage(tenantId, {
+        appointmentId: appt.id,
+        toPhone: "573007778899",
+        templateName: "recordatorio",
+      }),
+    ]);
+
+    // Exactamente una obtiene id; la otra ve el conflicto y devuelve null.
+    const ids = [a, b].filter((x): x is string => x !== null);
+    expect(ids).toHaveLength(1);
   });
 });

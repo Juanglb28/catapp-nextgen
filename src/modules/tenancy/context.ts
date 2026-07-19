@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { auth } from "@/lib/auth";
-import { getUserTenant } from "@/modules/tenancy/repository";
+import { getTenant, getUserTenant } from "@/modules/tenancy/repository";
 import { type MemberRole } from "@/modules/tenancy/schema";
 
 export type TenantContext = {
@@ -41,3 +41,11 @@ export async function resolveTenant(): Promise<TenantContext> {
  * para no repetir la consulta de sesión/membership en el mismo render.
  */
 export const requireTenant = cache(resolveTenant);
+
+/**
+ * Tenant completo cacheado por request (B0.3). El layout y la página del mismo
+ * segmento suelen pedir el tenant por separado: sin caché eran 2 consultas
+ * idénticas por navegación. Úsese en Server Components de render; las actions y
+ * crons pueden seguir con `getTenant` directo (viven en requests distintos).
+ */
+export const getTenantCached = cache(getTenant);

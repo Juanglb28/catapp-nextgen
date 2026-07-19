@@ -20,9 +20,11 @@ import {
   groupByDayKey,
 } from "@/modules/appointments/agenda";
 import { AgendaCard } from "@/modules/appointments/components/agenda-card";
-import { listAppointmentsForAgenda } from "@/modules/appointments/repository";
-import { requireTenant } from "@/modules/tenancy/context";
-import { getTenant } from "@/modules/tenancy/repository";
+import {
+  hasScheduledInRange,
+  listAppointmentsForAgenda,
+} from "@/modules/appointments/repository";
+import { getTenantCached, requireTenant } from "@/modules/tenancy/context";
 
 export const metadata: Metadata = { title: "Citas" };
 
@@ -34,7 +36,7 @@ export default async function CitasPage({
   searchParams: Promise<{ date?: string; view?: string }>;
 }) {
   const { tenantId } = await requireTenant();
-  const tenant = await getTenant(tenantId);
+  const tenant = await getTenantCached(tenantId);
   const tz = tenant?.timezone ?? "America/Bogota";
 
   const sp = await searchParams;
@@ -49,10 +51,10 @@ export default async function CitasPage({
   const selected =
     typeof sp.date === "string" && DATE_RE.test(sp.date) ? sp.date : today;
 
-  // Badge en tab "Proximas": hay citas manana?
+  // Badge en tab "Proximas": ¿hay citas mañana? EXISTS ligero en vez de cargar la
+  // agenda completa de mañana solo para un booleano (B0.3).
   const { start: tmrStart, end: tmrEnd } = tenantDayRangeUtc(tomorrow, tz);
-  const tmrAppts = await listAppointmentsForAgenda(tenantId, tmrStart, tmrEnd);
-  const hasTomorrow = tmrAppts.some((a) => a.status === "scheduled");
+  const hasTomorrow = await hasScheduledInRange(tenantId, tmrStart, tmrEnd);
 
   return (
     <div className="pb-24">

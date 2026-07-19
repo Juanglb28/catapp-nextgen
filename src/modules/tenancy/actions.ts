@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { normalizePhoneCO } from "@/lib/phone";
+import { swallow } from "@/lib/swallow";
 import { auth } from "@/lib/auth";
 import { requireTenant } from "@/modules/tenancy/context";
 import { onboardingSchema } from "@/modules/tenancy/onboarding-validation";
@@ -125,8 +126,9 @@ export async function createTenant(input: unknown): Promise<ActionResult> {
   if (parsed.data.createSampleServices) {
     try {
       await createServices(tenantId, SAMPLE_SERVICES);
-    } catch {
-      // No bloquea el onboarding.
+    } catch (err) {
+      // No bloquea el onboarding: los servicios de ejemplo son opcionales.
+      swallow(err, { module: "tenancy", op: "onboarding.seedServices", tenantId });
     }
   }
 

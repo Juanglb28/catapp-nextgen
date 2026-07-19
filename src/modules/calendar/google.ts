@@ -1,3 +1,5 @@
+import { swallow } from "@/lib/swallow";
+
 import type { CalendarEventBody, SendUpdates } from "./event";
 import { getGoogleAccount, getRefreshToken, markBroken } from "./repository";
 
@@ -181,8 +183,9 @@ export async function revokeToken(token: string): Promise<void> {
     await fetch(`${REVOKE_URL}?token=${encodeURIComponent(token)}`, {
       method: "POST",
     });
-  } catch {
+  } catch (err) {
     // Si la revocación falla, igual borramos la fila local.
+    swallow(err, { module: "calendar", op: "revokeToken" });
   }
 }
 
