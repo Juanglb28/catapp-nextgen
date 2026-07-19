@@ -1,7 +1,23 @@
-# Estado del proyecto — CatApp
+# Estado del proyecto — CatApp-NextGen
 
 > Fuente de verdad del progreso. Se actualiza al cerrar cada bloque (ver Quality Gate, sección 6 del plan).
-> Última actualización: 2026-07-02 (resync del meta de drizzle verificada: `db:generate` limpio y `db:check` OK)
+> Última actualización: 2026-07-19.
+
+## Modernización CatApp-NextGen (fork de CatApp @ 14c4167)
+
+> Auditoría y roadmap completos en `D:\Trabajo\migration\` (docs 00–12). CHANGELOG detallado en `migration/CHANGELOG.md`. El original `D:\Trabajo\CatApp` es inmutable.
+
+| Bloque | Estado | Fecha | Notas |
+| --- | --- | --- | --- |
+| **B0 · Higiene + Quick Wins** | ✅ | 2026-07-19 | Migración 0025 (índices); unique idempotente en `wa_messages`; `cache(getTenant)`+`Promise.all`; pool pg explícito; `swallow()` en 6 catches server-side + `(app)/error.tsx`; `constantTimeEqual` en crons/webhook; cookies OAuth `secure`; limpieza de código muerto; `.env.example` +8 vars + `lib/env.ts` fail-fast. Gate: typecheck ✓, lint ✓, 172 tests ✓. **Build completo pendiente en máquina de Juan** (`pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build`). Aplicar migración: `pnpm db:migrate` (0025, aditiva; backup previo si hay datos). |
+| B1 · Producto/SaaS | ⬜ | — | Requiere decisiones D-18/bonos/rol staff/datos (ver `migration/12-ROADMAP.md`). |
+| B2 · Robustez de datos | ⬜ | — | Pagos atómicos, bono transaccional, Zod 100%. |
+| B3 · Seguridad 2ª capa | ⬜ | — | App-lock anti-fuerza-bruta, email verification, rate-limit robusto. |
+| B4–B7 | ⬜ | — | Arquitectura, escala, UX, operación/docs. |
+
+---
+
+## (Histórico del original CatApp — heredado del fork)
 
 ## Mejoras fuera de plan base (staging)
 
