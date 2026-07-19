@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Security audit
+        # Fail on high or critical vulnerabilities; moderate ones are reported.
+        run: pnpm audit --audit-level=high
+
+      - name: Build
+        run: pnpm build
+        env:
+          # Secret solo para que el build no falle; no se usa en runtime.
+          BETTER_AUTH_SECRET: build-time-placeholder
+          # Sentry source map upload (opcional; si no está configurado Sentry lo omite).
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: quality
+    # Solo correr en main o si el PR toca archivos relevantes.
+    if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'e2e')
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: catapp_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/catapp_e2e
+      # Fallback para que next build no falle si el secret no está configurado.
+      # Los tests sí fallarán sin E2E_TEST_EMAIL/PASSWORD — ver instrucciones abajo.
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || 'e2e-ci-build-placeholder-secret-32c' }}
+      BETTER_AUTH_URL: http://localhost:3000
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      # Las variables opcionales (Google, WhatsApp) se omiten — las features
+      # quedan inactivas y los tests que las necesitan se saltan.
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        # Solo Chromium; el proyecto "mobile" usa Chromium con viewport de iPhone.
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Apply DB migrations
+        run: pnpm db:migrate
+
+      - name: Seed usuario de prueba
+        # Crea el usuario E2E si no existe. El script lee E2E_TEST_EMAIL y
+        # E2E_TEST_PASSWORD desde el entorno y llama a Better Auth directamente.
+        run: node --import tsx/esm scripts/seed-e2e-user.ts
+        continue-on-error: true # El seed puede fallar si el usuario ya existe.
+
+      - name: Build producción
+        run: pnpm build
+
+      - name: Correr suite E2E
+        run: pnpm test:e2e --project=mobile
+        # Solo el proyecto mobile en CI para reducir el tiempo de ejecución.
+        # El proyecto desktop se puede habilitar agregando --project=desktop.
+
+      - name: Subir trazas de Playwright como artefacto
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

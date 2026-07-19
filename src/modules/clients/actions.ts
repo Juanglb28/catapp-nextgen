@@ -1,0 +1,344 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { normalizePhoneCO } from "@/lib/phone";
+import {
+  fetchGoogleContacts,
+  getAccessTokenForSettings,
+  getCalendarAccess,
+  upsertBirthdayCalendarEvent,
+} from "@/modules/calendar/google";
+import { requireTenant } from "@/modules/tenancy/context";
+
+import { sendBirthdayPushToTenant } from "@/modules/birthdays/push";
+import { upsertBirthdayBonus } from "@/modules/birthdays/repository";
+import {
+  archiveClient,
+  createClient,
+  deleteClient,
+  type ClientInput,
+  listClientsWithoutBirthday,
+  restoreClient,
+  setClientBirthdayGcalEventId,
+  setClientOptOut,
+  updateClient,
+  updateClientBirthday,
+} from "./repository";
+import { clientFormSchema } from "./validation";
+
+/** Detecta una violación de unique constraint de PostgreSQL (código 23505). */
+function isDuplicatePhone(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const e = error as Record<string, unknown>;
+  return (
+    e["code"] === "23505" &&
+    typeof e["constraint"] === "string" &&
+    e["constraint"].includes("phone")
+  );
+}
+
+/** Entrada mínima para importar un contacto de Google. */
+export type ContactImportInput = {
+  name: string;
+  /** Teléfono ya normalizado a E.164 (+57XXXXXXXXXX). */
+  phone: string;
+  email: string;
+  /** Fecha de cumpleaños "YYYY-MM-DD" extraída de Google Contacts (opcional). */
+  birthdayDate?: string;
+};
+
+export type ActionResult<T = undefined> =
+  | { ok: true; data: T }
+  | { ok: false; error: string };
+
+/** Normaliza el formulario validado a la forma que persiste el repositorio. */
+function toClientInput(data: {
+  name: string;
+  phone: string;
+  email: string;
+  notes: string;
+  birthdayDate: string;
+}): ClientInput {
+  return {
+    name: data.name,
+    // El schema ya garantizó que normalizePhoneCO no es null.
+    phone: normalizePhoneCO(data.phone)!,
+    email: data.email === "" ? null : data.email,
+    notes: data.notes === "" ? null : data.notes,
+    birthdayDate: data.birthdayDate === "" ? null : data.birthdayDate,
+  };
+}
+
+function firstError(input: unknown) {
+  const parsed = clientFormSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false as const,
+      error: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+    };
+  }
+  return { ok: true as const, data: parsed.data };
+}
+
+/** Activa/desactiva el opt-out de mensajes automáticos de la clienta (F8.B2). */
+export async function setClientOptOutAction(
+  id: string,
+  optOut: boolean,
+): Promise<ActionResult> {
+  const { tenantId } = await requireTenant();
+  const updated = await setClientOptOut(tenantId, id, optOut);
+  if (!updated) return { ok: false, error: "No se encontró la clienta." };
+  revalidatePath(`/clientas/${id}`);
+  return { ok: true, data: undefined };
+}
+
+export async function createClientAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const { tenantId } = await requireTenant();
+  const parsed = firstError(input);
+  if (!parsed.ok) return parsed;
+
+  try {
+    const client = await createClient(tenantId, toClientInput(parsed.data));
+    revalidatePath("/clientas");
+    return { ok: true, data: { id: client.id } };
+  } catch (e) {
+    if (isDuplicatePhone(e)) {
+      return { ok: false, error: "Ya existe una clienta con ese teléfono." };
+    }
+    throw e;
+  }
+}
+
+export async function updateClientAction(
+  id: string,
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const { tenantId } = await requireTenant();
+  const parsed = firstError(input);
+  if (!parsed.ok) return parsed;
+
+  let client: Awaited<ReturnType<typeof updateClient>>;
+  try {
+    client = await updateClient(tenantId, id, toClientInput(parsed.data));
+  } catch (e) {
+    if (isDuplicatePhone(e)) {
+      return { ok: false, error: "Ya existe una clienta con ese teléfono." };
+    }
+    throw e;
+  }
+  if (!client) return { ok: false, error: "No se encontró la clienta." };
+
+  // Sincronizar cumpleaños a Google Calendar si hay fecha y conexión activa.
+  if (client.birthdayDate) {
+    try {
+      const access = await getCalendarAccess(tenantId);
+      if (access) {
+        const gcalId = await upsertBirthdayCalendarEvent(
+          access.accessToken,
+          access.calendarId,
+          client.name,
+          client.birthdayDate,
+          client.birthdayGcalEventId,
+        );
+        if (!client.birthdayGcalEventId) {
+          await setClientBirthdayGcalEventId(tenantId, id, gcalId);
+        }
+      }
+    } catch {
+      // Falla silenciosa: no bloquear la actualización por GCal.
+    }
+  }
+
+  revalidatePath("/clientas");
+  revalidatePath(`/clientas/${id}`);
+  return { ok: true, data: { id: client.id } };
+}
+
+export async function archiveClientAction(
+  id: string,
+): Promise<ActionResult<undefined>> {
+  const { tenantId } = await requireTenant();
+  const client = await archiveClient(tenantId, id);
+  if (!client) return { ok: false, error: "No se encontró la clienta." };
+
+  revalidatePath("/clientas");
+  revalidatePath(`/clientas/${id}`);
+  return { ok: true, data: undefined };
+}
+
+export async function restoreClientAction(
+  id: string,
+): Promise<ActionResult<undefined>> {
+  const { tenantId } = await requireTenant();
+  const client = await restoreClient(tenantId, id);
+  if (!client) return { ok: false, error: "No se encontró la clienta." };
+
+  revalidatePath("/clientas");
+  revalidatePath(`/clientas/${id}`);
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Importa en lote contactos de Google.
+ * Recibe solo los contactos seleccionados (ya con teléfono normalizado).
+ * Los duplicados (constraint de phone único por tenant) se omiten en silencio.
+ */
+
+export async function importContactsAction(
+  contacts: ContactImportInput[],
+): Promise<ActionResult<{ imported: number; skipped: number }>> {
+  const { tenantId } = await requireTenant();
+
+  // Fecha de hoy en zona horaria del tenant (America/Bogota).
+  const todayBogota = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date()); // "YYYY-MM-DD"
+  const todayYear = parseInt(todayBogota.slice(0, 4), 10);
+
+  let imported = 0;
+  let skipped = 0;
+
+  for (const c of contacts) {
+    try {
+      const client = await createClient(tenantId, {
+        name: c.name,
+        phone: c.phone,
+        email: c.email === "" ? null : c.email,
+        notes: null,
+        birthdayDate: c.birthdayDate ?? null,
+      });
+      imported++;
+
+      // Si cumple años hoy, disparar bono inmediatamente.
+      if (c.birthdayDate && c.birthdayDate.slice(5) === todayBogota.slice(5)) {
+        try {
+          await upsertBirthdayBonus(tenantId, client.id, todayYear);
+          await sendBirthdayPushToTenant(tenantId, client.id);
+        } catch {
+          // No bloquear importación por fallo de bono.
+        }
+      }
+    } catch (e) {
+      if (isDuplicatePhone(e)) {
+        skipped++;
+        continue;
+      }
+      throw e;
+    }
+  }
+
+  revalidatePath("/clientas");
+  return { ok: true, data: { imported, skipped } };
+}
+
+/**
+ * Sincroniza fechas de cumpleaños desde Google Contacts a clientas existentes.
+ * Solo actualiza clientas que todavía no tienen birthday_date.
+ * Si hoy es el cumpleaños, dispara el bono inmediatamente (no espera el cron de 5 AM).
+ */
+export async function syncBirthdaysFromContactsAction(): Promise<
+  ActionResult<{ updated: number; bonusFiredToday: number }>
+> {
+  const { tenantId } = await requireTenant();
+
+  const accessToken = await getAccessTokenForSettings(tenantId);
+  if (!accessToken) {
+    return {
+      ok: false,
+      error: "No hay una cuenta de Google conectada para este negocio.",
+    };
+  }
+
+  // Clientas activas sin cumpleaños registrado.
+  const withoutBirthday = await listClientsWithoutBirthday(tenantId);
+  if (withoutBirthday.length === 0) {
+    return { ok: true, data: { updated: 0, bonusFiredToday: 0 } };
+  }
+
+  // Mapa E.164 → clienta local.
+  const phoneToClient = new Map(withoutBirthday.map((c) => [c.phone, c]));
+
+  // Traer contactos de Google (raw GoogleContact[]).
+  const googleContacts = await fetchGoogleContacts(accessToken);
+
+  // Fecha de hoy en Bogotá.
+  const todayBogota = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date()); // "YYYY-MM-DD"
+  const todayYear = parseInt(todayBogota.slice(0, 4), 10);
+  const todayMD = todayBogota.slice(5); // "MM-DD"
+
+  let updated = 0;
+  let bonusFiredToday = 0;
+
+  for (const contact of googleContacts) {
+    // Extraer teléfono normalizado a E.164.
+    const rawPhone = contact.phoneNumbers?.[0]?.value?.trim() ?? null;
+    if (!rawPhone) continue;
+    const phone = normalizePhoneCO(rawPhone);
+    if (!phone) continue;
+
+    // Extraer cumpleaños en formato "YYYY-MM-DD".
+    const bd = contact.birthdays?.[0]?.date;
+    if (!bd) continue;
+    const year = bd.year && bd.year > 1 ? bd.year : 1900;
+    const birthdayDate = `${year}-${String(bd.month).padStart(2, "0")}-${String(bd.day).padStart(2, "0")}`;
+
+    const client = phoneToClient.get(phone);
+    if (!client) continue;
+
+    await updateClientBirthday(tenantId, client.id, birthdayDate);
+    updated++;
+
+    // Si cumple años hoy, disparar bono sin esperar el cron.
+    if (birthdayDate.slice(5) === todayMD) {
+      try {
+        await upsertBirthdayBonus(tenantId, client.id, todayYear);
+        await sendBirthdayPushToTenant(tenantId, client.id);
+        bonusFiredToday++;
+      } catch {
+        // No bloquear sync por fallo de bono.
+      }
+    }
+  }
+
+  revalidatePath("/clientas");
+  return { ok: true, data: { updated, bonusFiredToday } };
+}
+
+/**
+ * Resuelve un grupo de clientas duplicadas conservando una sola.
+ * - Sin citas → eliminación permanente.
+ * - Con citas → archivado lógico.
+ */
+export async function resolveDuplicatesAction(
+  keepId: string,
+  discardClients: { id: string; appointmentCount: number }[],
+): Promise<ActionResult<undefined>> {
+  const { tenantId } = await requireTenant();
+
+  for (const { id, appointmentCount } of discardClients) {
+    if (appointmentCount === 0) {
+      // Intentar eliminación permanente; si la FK falla, archivar.
+      const deleted = await deleteClient(tenantId, id);
+      if (!deleted) {
+        await archiveClient(tenantId, id);
+      }
+    } else {
+      await archiveClient(tenantId, id);
+    }
+  }
+
+  revalidatePath("/clientas");
+  revalidatePath("/clientas/duplicados");
+  return { ok: true, data: undefined };
+}

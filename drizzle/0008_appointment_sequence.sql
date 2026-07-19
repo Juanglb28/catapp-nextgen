@@ -1,0 +1,1 @@
+ALTER TABLE "appointments" ADD COLUMN "sequence" integer DEFAULT 0 NOT NULL;

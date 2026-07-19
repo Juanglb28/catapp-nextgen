@@ -1,0 +1,19 @@
+# Normaliza los fines de línea: LF en el repo y en el working tree.
+# Evita el ruido CRLF/LF en los diffs (Windows/OneDrive).
+* text=auto eol=lf
+
+# Archivos binarios: nunca tocar sus bytes.
+*.png   -text
+*.jpg   -text
+*.jpeg  -text
+*.gif   -text
+*.webp  -text
+*.ico   -text
+*.svg   -text
+*.woff  -text
+*.woff2 -text
+*.ttf   -text
+*.otf   -text
+*.eot   -text
+*.pdf   -text
+*.zip   -text

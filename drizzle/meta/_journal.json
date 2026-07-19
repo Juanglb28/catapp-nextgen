@@ -1,0 +1,181 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1781142459042,
+      "tag": "0000_warm_rafael_vega",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781154254236,
+      "tag": "0001_acoustic_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781199821048,
+      "tag": "0002_aromatic_lady_mastermind",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781207318267,
+      "tag": "0003_clients",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781209220568,
+      "tag": "0004_services",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781214863713,
+      "tag": "0005_appointments",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781224071956,
+      "tag": "0006_tenant_public_info",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781272158131,
+      "tag": "0007_message_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781273192715,
+      "tag": "0008_appointment_sequence",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781279413907,
+      "tag": "0009_google_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781300704261,
+      "tag": "0010_gcal_sync_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1781312969181,
+      "tag": "0011_inventory",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1781314953783,
+      "tag": "0012_wa_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1781316022676,
+      "tag": "0013_auto_messages_opt_out",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1750550400000,
+      "tag": "0014_tip_cop",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1782072878280,
+      "tag": "0015_handy_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1782346401000,
+      "tag": "0016_birthday_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1782346402000,
+      "tag": "0017_birthday_bonuses",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782346403000,
+      "tag": "0018_birthday_gcal_event",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1782408709000,
+      "tag": "0019_payment_method",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1782663958613,
+      "tag": "0020_unique_client_phone",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1782750000000,
+      "tag": "0021_client_confirmation",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1782940381908,
+      "tag": "0022_late_doctor_strange",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1784246400000,
+      "tag": "0023_redeem_discounted_bonuses",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784349700683,
+      "tag": "0024_app_lock_security",
+      "breakpoints": true
+    }
+  ]
+}

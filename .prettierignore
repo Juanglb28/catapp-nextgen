@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+build
+coverage
+pnpm-lock.yaml
+next-env.d.ts
+public
+*.ico
+
+# User-authored reference docs (preserve as-is)
+PLAN-APP-MANICURISTAS.md
+docs/DECISIONES.md

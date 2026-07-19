@@ -1,0 +1,62 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { authClient } from "@/lib/auth-client";
+
+export function ResetPasswordForm({ token }: { token: string }) {
+  const router = useRouter();
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password.length < 8) {
+      setErrorMsg("La contraseña debe tener al menos 8 caracteres.");
+      setStatus("error");
+      return;
+    }
+    setStatus("loading");
+    const { error } = await authClient.resetPassword({
+      newPassword: password,
+      token,
+    });
+    if (error) {
+      setErrorMsg("El enlace es inválido o ya expiró. Solicita uno nuevo.");
+      setStatus("error");
+      return;
+    }
+    router.push("/login?reset=ok");
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="new-password">Nueva contraseña</Label>
+        <Input
+          id="new-password"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Mínimo 8 caracteres"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={8}
+        />
+      </div>
+      {status === "error" && (
+        <p className="text-destructive text-sm" role="alert">
+          {errorMsg}
+        </p>
+      )}
+      <Button type="submit" className="w-full" disabled={status === "loading"}>
+        {status === "loading" ? "Guardando…" : "Cambiar contraseña"}
+      </Button>
+    </form>
+  );
+}

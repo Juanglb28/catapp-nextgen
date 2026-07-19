@@ -1,0 +1,27 @@
+# Configuración ÚNICA de Railway.
+# No volver a crear railway.json: si existen los dos, Railway da precedencia a
+# este .toml y el JSON se ignora en silencio. Así se perdió el preDeployCommand
+# y las migraciones dejaron de correr en cada deploy (bug 2026-07-18).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Aplica las migraciones pendientes ANTES de arrancar la nueva versión.
+preDeployCommand = "pnpm db:migrate"
+startCommand = "pnpm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[[crons]]
+name = "birthday-cron"
+schedule = "0 11 * * *"
+command = "curl -s -X POST http://localhost:$PORT/api/cron/birthdays -H 'Authorization: Bearer $CRON_SECRET'"
+
+[[crons]]
+name = "reminder-tomorrow-cron"
+schedule = "0 1 * * *"
+command = "curl -s -X POST http://localhost:$PORT/api/cron/reminder-tomorrow -H 'Authorization: Bearer $CRON_SECRET'"

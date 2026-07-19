@@ -1,0 +1,1 @@
+ALTER TABLE "appointments" ADD COLUMN IF NOT EXISTS "tip_cop" bigint DEFAULT 0 NOT NULL;
