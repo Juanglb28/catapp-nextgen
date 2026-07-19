@@ -183,6 +183,13 @@
       "when": 1784501522605,
       "tag": "0025_perf_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1784502915727,
+      "tag": "0026_drop_member_role",
+      "breakpoints": true
     }
   ]
 }

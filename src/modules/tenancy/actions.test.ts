@@ -56,7 +56,7 @@ describe("createTenant (server action)", () => {
 
   it("es idempotente si el usuario ya tiene negocio", async () => {
     getSession.mockResolvedValue({ user: { id: "u1" } } as never);
-    getUserTenantMock.mockResolvedValue({ tenantId: "t1", role: "owner" });
+    getUserTenantMock.mockResolvedValue({ tenantId: "t1" });
     const r = await createTenant(validInput);
     expect(r.ok).toBe(true);
     expect(createMock).not.toHaveBeenCalled();

@@ -26,12 +26,9 @@ const getSession = vi.mocked(auth.api.getSession);
 const getUserTenantMock = vi.mocked(getUserTenant);
 
 // "DB" simulada: dos usuarios, cada uno en un tenant distinto.
-const MEMBERSHIPS: Record<
-  string,
-  { tenantId: string; role: "owner" | "staff" }
-> = {
-  userA: { tenantId: "tenant-A", role: "owner" },
-  userB: { tenantId: "tenant-B", role: "staff" },
+const MEMBERSHIPS: Record<string, { tenantId: string }> = {
+  userA: { tenantId: "tenant-A" },
+  userB: { tenantId: "tenant-B" },
 };
 
 beforeEach(() => {
@@ -52,7 +49,6 @@ describe("aislamiento: resolveTenant mapea cada usuario a su propio tenant", () 
     await expect(resolveTenant()).resolves.toMatchObject({
       userId: "userA",
       tenantId: "tenant-A",
-      role: "owner",
     });
   });
 

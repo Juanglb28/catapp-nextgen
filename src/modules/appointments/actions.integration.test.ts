@@ -34,7 +34,7 @@ describe.runIf(TEST_DB)("createAppointmentAction (integración)", () => {
     const a = await seedUser();
     userId = a.id;
     tenantId = await seedTenantWithOwner(a.id, "Negocio A");
-    requireTenantMock.mockResolvedValue({ tenantId, userId, role: "owner" });
+    requireTenantMock.mockResolvedValue({ tenantId, userId });
 
     const clientsRepo = await import("@/modules/clients/repository");
     const servicesRepo = await import("@/modules/services/repository");

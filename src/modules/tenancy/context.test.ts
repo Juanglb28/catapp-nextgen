@@ -43,11 +43,10 @@ describe("resolveTenant", () => {
 
   it("con tenant devuelve el contexto", async () => {
     getSession.mockResolvedValue({ user: { id: "u1" } } as never);
-    getUserTenantMock.mockResolvedValue({ tenantId: "t1", role: "owner" });
+    getUserTenantMock.mockResolvedValue({ tenantId: "t1" });
     await expect(resolveTenant()).resolves.toEqual({
       userId: "u1",
       tenantId: "t1",
-      role: "owner",
     });
   });
 });

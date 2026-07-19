@@ -16,6 +16,7 @@ import { getTenant } from "@/modules/tenancy/repository";
 import { BusinessPublicInfoSheet } from "@/modules/tenancy/components/business-public-info-sheet";
 import { LogoutButton } from "@/modules/tenancy/components/logout-button";
 import { AutoMessagesToggle } from "@/modules/whatsapp/components/auto-messages-toggle";
+import { isWhatsAppEnabled } from "@/modules/whatsapp/cloud-api";
 import { InstallCard } from "@/modules/pwa/components/install-card";
 import { EnablePushButton } from "@/modules/push/components/enable-push-button";
 import { TestPushButton } from "@/modules/push/components/test-push-button";
@@ -175,9 +176,18 @@ export default async function AjustesPage() {
         </div>
       </section>
 
+      {/* El toggle solo tiene efecto si la Cloud API de WhatsApp está configurada.
+          Sin ella era un control que no hacía nada (C-3, B1.4): se etiqueta. */}
       <section className="space-y-2">
         <h2 className="text-sm font-medium">Mensajes automáticos</h2>
-        <AutoMessagesToggle initial={tenant?.autoMessages ?? true} />
+        {isWhatsAppEnabled() ? (
+          <AutoMessagesToggle initial={tenant?.autoMessages ?? true} />
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Próximamente. Por ahora envía los recordatorios y mensajes tú misma
+            por WhatsApp desde cada cita (con un toque).
+          </p>
+        )}
       </section>
 
       <section className="space-y-2">

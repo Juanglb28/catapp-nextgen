@@ -2,7 +2,6 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
-  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -35,8 +34,11 @@ export const tenants = pgTable("tenants", {
     .defaultNow(),
 });
 
-export const memberRole = pgEnum("member_role", ["owner", "staff"]);
-
+// Rol de membresía eliminado (D-20, B1.2): el negocio es de una sola persona
+// (owner). No había ningún control que distinguiera owner/staff, así que el enum
+// solo daba una falsa sensación de permisos (06-SEG H-02). La tabla memberships
+// se conserva como relación user↔tenant; la columna `role` y el enum `member_role`
+// se eliminan en la migración 0026.
 export const memberships = pgTable(
   "memberships",
   {
@@ -47,7 +49,6 @@ export const memberships = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
-    role: memberRole("role").notNull().default("owner"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -58,4 +59,3 @@ export const memberships = pgTable(
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 export type Membership = typeof memberships.$inferSelect;
-export type MemberRole = (typeof memberRole.enumValues)[number];

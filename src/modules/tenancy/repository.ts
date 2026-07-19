@@ -1,12 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import {
-  memberships,
-  type MemberRole,
-  type Tenant,
-  tenants,
-} from "@/modules/tenancy/schema";
+import { memberships, type Tenant, tenants } from "@/modules/tenancy/schema";
 
 /** Actualiza los datos públicos del negocio (F4.B1). */
 export async function updateTenantPublicInfo(
@@ -45,9 +40,9 @@ export async function ping(): Promise<void> {
  */
 export async function getUserTenant(
   userId: string,
-): Promise<{ tenantId: string; role: MemberRole } | null> {
+): Promise<{ tenantId: string } | null> {
   const rows = await db
-    .select({ tenantId: memberships.tenantId, role: memberships.role })
+    .select({ tenantId: memberships.tenantId })
     .from(memberships)
     .where(eq(memberships.userId, userId))
     .limit(1);
@@ -82,7 +77,6 @@ export async function createTenantWithOwner(
     await tx.insert(memberships).values({
       userId,
       tenantId: tenant.id,
-      role: "owner",
     });
 
     return { tenantId: tenant.id };

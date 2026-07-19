@@ -4,12 +4,10 @@ import { cache } from "react";
 
 import { auth } from "@/lib/auth";
 import { getTenant, getUserTenant } from "@/modules/tenancy/repository";
-import { type MemberRole } from "@/modules/tenancy/schema";
 
 export type TenantContext = {
   userId: string;
   tenantId: string;
-  role: MemberRole;
 };
 
 /**
@@ -32,7 +30,6 @@ export async function resolveTenant(): Promise<TenantContext> {
   return {
     userId: session.user.id,
     tenantId: membership.tenantId,
-    role: membership.role,
   };
 }
 

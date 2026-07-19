@@ -88,9 +88,7 @@ describe.runIf(TEST_DB)("aislamiento multi-tenant (integración)", () => {
     const { memberships } = await import("@/modules/tenancy/schema");
 
     await expect(
-      db
-        .insert(memberships)
-        .values({ userId: a.id, tenantId: tenantA, role: "staff" }),
+      db.insert(memberships).values({ userId: a.id, tenantId: tenantA }),
     ).rejects.toThrow();
   });
 });

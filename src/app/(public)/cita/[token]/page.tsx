@@ -189,14 +189,24 @@ export default async function PublicCitaPage({
           </div>
         </div>
 
-        {/* Dirección */}
+        {/* Dirección — enlace a Google Maps para llegar de un toque (QW-7). */}
         {appt.business.publicAddress ? (
-          <div className="flex items-start gap-3 border-t pt-3">
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+              appt.business.publicAddress,
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-3 border-t pt-3"
+          >
             <MapPin className="text-brand mt-0.5 size-5 shrink-0" aria-hidden />
-            <p className="text-sm whitespace-pre-wrap">
+            <span className="text-sm whitespace-pre-wrap">
               {appt.business.publicAddress}
-            </p>
-          </div>
+              <span className="text-brand mt-0.5 block text-xs font-medium">
+                Ver en el mapa →
+              </span>
+            </span>
+          </a>
         ) : null}
 
         {/* Nota pública */}
