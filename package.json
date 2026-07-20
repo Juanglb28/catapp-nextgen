@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:watch": "vitest",
     "test:integration": "vitest run --no-file-parallelism integration",
     "test:e2e": "playwright test",

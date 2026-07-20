@@ -19,6 +19,11 @@ export default defineConfig({
     // los tests, de forma determinista. Ver src/test/global-setup.ts (B2.4).
     globalSetup: ["./src/test/global-setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // Los tests de integración comparten UNA sola base de datos y hacen TRUNCATE
+    // entre tests; correr archivos en paralelo hace que se pisen (deadlocks y
+    // violaciones de FK). Por eso los archivos se ejecutan en serie. Los tests
+    // dentro de cada archivo ya corren secuencialmente. Ver B2.4/db-harness.
+    fileParallelism: false,
   },
   resolve: {
     alias: {
