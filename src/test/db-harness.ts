@@ -7,12 +7,16 @@ import { randomUUID } from "node:crypto";
  * migraciones aplicadas, indicada en `TEST_DATABASE_URL`. Sin esa variable
  * (CI/sandbox) los tests que la usan se saltan vía `describe.runIf(TEST_DB)`.
  *
- * Para correrlos en local (Postgres de docker-compose, puerto 5433):
- *   1. docker compose up -d
- *   2. TEST_DATABASE_URL="postgresql://catapp:catapp@127.0.0.1:5433/catapp" \
- *      pnpm db:migrate
- *   3. TEST_DATABASE_URL="postgresql://catapp:catapp@127.0.0.1:5433/catapp" \
- *      pnpm test
+ * Para correrlos en local usa una base DESECHABLE (el harness hace TRUNCATE
+ * CASCADE entre tests: NUNCA apuntes TEST_DATABASE_URL a tu base de desarrollo).
+ * Y córrelos EN SERIE con `pnpm test:integration` (--no-file-parallelism): todos
+ * los archivos comparten la misma base y hacen TRUNCATE, así que en paralelo se
+ * pisan y dan deadlocks/violaciones de FK. Ejemplo (PowerShell):
+ *   docker exec catapp-db psql -U catapp -c "CREATE DATABASE catapp_test;"
+ *   $env:DATABASE_URL="postgresql://catapp:catapp@127.0.0.1:5433/catapp_test"
+ *   pnpm db:migrate
+ *   $env:TEST_DATABASE_URL="postgresql://catapp:catapp@127.0.0.1:5433/catapp_test"
+ *   pnpm test:integration
  *
  * El cliente de DB se importa de forma diferida (dynamic import) DESPUÉS de
  * apuntar `DATABASE_URL` al test, igual que el resto de tests de integración;
