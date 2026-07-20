@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { normalizePhoneCO } from "@/lib/phone";
 import { swallow } from "@/lib/swallow";
@@ -189,10 +190,30 @@ export async function restoreClientAction(
  * Los duplicados (constraint de phone único por tenant) se omiten en silencio.
  */
 
+const importContactsSchema = z
+  .array(
+    z.object({
+      name: z.string().trim().min(1).max(120),
+      phone: z.string().trim().min(1).max(20),
+      email: z.string().max(200),
+      birthdayDate: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+    }),
+  )
+  .max(500);
+
 export async function importContactsAction(
   contacts: ContactImportInput[],
 ): Promise<ActionResult<{ imported: number; skipped: number }>> {
   const { tenantId } = await requireTenant();
+
+  const parsed = importContactsSchema.safeParse(contacts);
+  if (!parsed.success) {
+    return { ok: false, error: "Lista de contactos inválida." };
+  }
+  const validContacts = parsed.data;
 
   // Fecha de hoy en zona horaria del tenant (America/Bogota).
   const todayBogota = new Intl.DateTimeFormat("en-CA", {
@@ -206,7 +227,7 @@ export async function importContactsAction(
   let imported = 0;
   let skipped = 0;
 
-  for (const c of contacts) {
+  for (const c of validContacts) {
     try {
       const client = await createClient(tenantId, {
         name: c.name,
@@ -324,22 +345,30 @@ export async function syncBirthdaysFromContactsAction(): Promise<
  * - Sin citas → eliminación permanente.
  * - Con citas → archivado lógico.
  */
+const resolveDuplicatesSchema = z.object({
+  keepId: z.string().uuid(),
+  discardIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
 export async function resolveDuplicatesAction(
   keepId: string,
   discardClients: { id: string; appointmentCount: number }[],
 ): Promise<ActionResult<undefined>> {
   const { tenantId } = await requireTenant();
 
-  for (const { id, appointmentCount } of discardClients) {
-    if (appointmentCount === 0) {
-      // Intentar eliminación permanente; si la FK falla, archivar.
-      const deleted = await deleteClient(tenantId, id);
-      if (!deleted) {
-        await archiveClient(tenantId, id);
-      }
-    } else {
-      await archiveClient(tenantId, id);
-    }
+  // El `appointmentCount` del cliente NO se usa para decidir (audit H-2): un
+  // payload manipulado no debe forzar un borrado. El servidor intenta borrar y,
+  // si la FK lo impide (tiene citas), archiva — con la DB como fuente de verdad.
+  const parsed = resolveDuplicatesSchema.safeParse({
+    keepId,
+    discardIds: discardClients.map((c) => c.id),
+  });
+  if (!parsed.success) return { ok: false, error: "Solicitud inválida." };
+
+  for (const id of parsed.data.discardIds) {
+    if (id === parsed.data.keepId) continue; // nunca borrar la que se conserva
+    const deleted = await deleteClient(tenantId, id);
+    if (!deleted) await archiveClient(tenantId, id);
   }
 
   revalidatePath("/clientas");

@@ -156,14 +156,32 @@ export async function archiveClient(
  * Solo funciona si no tiene citas asociadas (la FK sin onDelete=cascade lo garantiza).
  * Devuelve true si se eliminó, false si no existía o pertenece a otro tenant.
  */
+/**
+ * Borra permanentemente una clienta. Devuelve `false` si no existe O si tiene
+ * citas que la referencian (violación de FK 23503) — en ese caso el llamador debe
+ * archivarla. Así el servidor decide con la DB como fuente de verdad, sin confiar
+ * en ningún conteo enviado por el cliente (B2.3, audit H-2).
+ */
 export async function deleteClient(
   tenantId: string,
   id: string,
 ): Promise<boolean> {
-  const result = await db
-    .delete(clients)
-    .where(and(eq(clients.tenantId, tenantId), eq(clients.id, id)));
-  return (result.rowCount ?? 0) > 0;
+  try {
+    const result = await db
+      .delete(clients)
+      .where(and(eq(clients.tenantId, tenantId), eq(clients.id, id)));
+    return (result.rowCount ?? 0) > 0;
+  } catch (e) {
+    if (
+      typeof e === "object" &&
+      e !== null &&
+      "code" in e &&
+      (e as { code?: string }).code === "23503"
+    ) {
+      return false; // tiene citas: no se puede borrar, hay que archivar
+    }
+    throw e;
+  }
 }
 
 /** Restaura una clienta archivada del tenant. */
