@@ -1,3 +1,12 @@
+// Antes de CUALQUIER import de módulos de la app: si hay una base de test,
+// apunta DATABASE_URL a ella. Algunos archivos de integración importan `@/lib/db`
+// de forma estática (al cargar), antes de que el arnés fije DATABASE_URL; sin
+// esto, su pool se crea sin URL y falla con "SASL: client password must be a
+// string". setupFiles corre antes que los imports del archivo de test (B2.4).
+if (process.env.TEST_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+}
+
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 

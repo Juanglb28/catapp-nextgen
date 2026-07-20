@@ -108,7 +108,29 @@ describe.runIf(TEST_DB)("finanzas (integración)", () => {
     await completed(tenantA, ana, new Date("2026-06-25T15:00:00Z"), 1, 4000n);
 
     // --- Tenant B (aislamiento): completada en julio, total alto ---
-    await completed(tenantB, ana, new Date("2026-07-12T15:00:00Z"), 9, 0n);
+    // La clienta debe pertenecer a B (createAppointment valida el tenant).
+    const clientB = (
+      await clientsRepo.createClient(tenantB, {
+        name: "Clienta B",
+        phone: "+573001110003",
+        email: null,
+        notes: null,
+      })
+    ).id;
+    const svcB = (
+      await servicesRepo.createService(tenantB, {
+        name: "Manicure B",
+        basePriceCop: PRICE,
+        durationMin: 60,
+      })
+    ).id;
+    await apptRepo.createAppointment(tenantB, {
+      clientId: clientB,
+      startsAt: new Date("2026-07-12T15:00:00Z"),
+      endsAt: new Date("2026-07-12T16:00:00Z"),
+      services: [{ serviceId: svcB, priceCop: PRICE, quantity: 9 }],
+      status: "completed",
+    });
   });
 
   afterAll(async () => {
