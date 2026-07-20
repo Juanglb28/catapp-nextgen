@@ -21,6 +21,7 @@ import { InstallCard } from "@/modules/pwa/components/install-card";
 import { EnablePushButton } from "@/modules/push/components/enable-push-button";
 import { TestPushButton } from "@/modules/push/components/test-push-button";
 import { BirthdayBonusSettingsSheet } from "@/modules/tenancy/components/birthday-bonus-settings-sheet";
+import { listBonusOptions } from "@/modules/birthdays/repository";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const metadata: Metadata = { title: "Ajustes" };
@@ -35,7 +36,16 @@ function formatCOP(amount: bigint): string {
 
 export default async function AjustesPage() {
   const { tenantId } = await requireTenant();
-  const tenant = await getTenant(tenantId);
+  const [tenant, bonusOptions] = await Promise.all([
+    getTenant(tenantId),
+    listBonusOptions(tenantId),
+  ]);
+  const bonusOptionsView = bonusOptions.map((o) => ({
+    id: o.id,
+    label: o.label,
+    discountCop: Number(o.discountCop),
+    active: o.active,
+  }));
 
   return (
     <div className="space-y-6">
@@ -194,10 +204,7 @@ export default async function AjustesPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium">Bono de cumpleaños</h2>
           <BirthdayBonusSettingsSheet
-            initial={{
-              bonusManicureCop: Number(tenant?.bonusManicureCop ?? 0n),
-              bonusVeloterapiaCop: Number(tenant?.bonusVeloterapiaCop ?? 0n),
-            }}
+            options={bonusOptionsView}
             trigger={
               <Button variant="ghost" size="sm">
                 <Pencil className="size-4" />
@@ -207,19 +214,26 @@ export default async function AjustesPage() {
           />
         </div>
         <p className="text-muted-foreground text-sm">
-          Valor que se descuenta al aplicar el bono en una cita.
+          Opciones de regalo que tus clientas pueden elegir, con su descuento.
         </p>
         <div className="rounded-xl border p-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Manicure tradicional</span>
-            <span>{formatCOP(tenant?.bonusManicureCop ?? 0n)}</span>
-          </div>
-          <div className="mt-1 flex justify-between">
+          {bonusOptionsView.filter((o) => o.active).length > 0 ? (
+            bonusOptionsView
+              .filter((o) => o.active)
+              .map((o) => (
+                <div
+                  key={o.id}
+                  className="flex justify-between not-first:mt-1"
+                >
+                  <span className="text-muted-foreground">{o.label}</span>
+                  <span>{formatCOP(BigInt(o.discountCop))}</span>
+                </div>
+              ))
+          ) : (
             <span className="text-muted-foreground">
-              Veloterapia con exfoliación
+              Sin opciones activas. Toca «Editar» para agregar.
             </span>
-            <span>{formatCOP(tenant?.bonusVeloterapiaCop ?? 0n)}</span>
-          </div>
+          )}
         </div>
       </section>
 

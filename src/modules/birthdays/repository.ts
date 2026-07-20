@@ -5,9 +5,65 @@ import { clients } from "@/modules/clients/schema";
 
 import {
   type BirthdayBonus,
+  type BonusOption,
   birthdayBonuses,
+  bonusOptions,
   pushSubscriptions,
 } from "./schema";
+
+// ─── Opciones de bono por tenant (D-19, B1.1) ────────────────────────────────
+
+/** Opciones de bono del tenant. `activeOnly` para la elección pública. */
+export async function listBonusOptions(
+  tenantId: string,
+  opts?: { activeOnly?: boolean },
+): Promise<BonusOption[]> {
+  const where = opts?.activeOnly
+    ? and(eq(bonusOptions.tenantId, tenantId), eq(bonusOptions.active, true))
+    : eq(bonusOptions.tenantId, tenantId);
+  return db
+    .select()
+    .from(bonusOptions)
+    .where(where)
+    .orderBy(desc(bonusOptions.active), desc(bonusOptions.createdAt));
+}
+
+/** Opción por id, tenant-scoped. */
+export async function getBonusOption(
+  tenantId: string,
+  optionId: string,
+): Promise<BonusOption | null> {
+  const rows = await db
+    .select()
+    .from(bonusOptions)
+    .where(and(eq(bonusOptions.tenantId, tenantId), eq(bonusOptions.id, optionId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createBonusOption(
+  tenantId: string,
+  data: { label: string; discountCop: bigint },
+): Promise<BonusOption> {
+  const [row] = await db
+    .insert(bonusOptions)
+    .values({ tenantId, label: data.label, discountCop: data.discountCop })
+    .returning();
+  return row!;
+}
+
+export async function updateBonusOption(
+  tenantId: string,
+  optionId: string,
+  data: { label?: string; discountCop?: bigint; active?: boolean },
+): Promise<BonusOption | null> {
+  const [row] = await db
+    .update(bonusOptions)
+    .set(data)
+    .where(and(eq(bonusOptions.tenantId, tenantId), eq(bonusOptions.id, optionId)))
+    .returning();
+  return row ?? null;
+}
 
 /**
  * Repositorio de bonos de cumpleaños — alcance de tenant obligatorio (D-11).
@@ -174,14 +230,22 @@ export async function declineBirthdayBonus(
   return row ?? null;
 }
 
-/** Clienta elige su servicio → status 'chosen' + guarda la opción. */
+/**
+ * Clienta elige su opción → status 'chosen'. Guarda el id de la opción y una
+ * copia de su etiqueta (snapshot para mostrarla aunque la opción se borre luego).
+ */
 export async function chooseBirthdayOption(
   bonusId: string,
-  chosenOption: string,
+  option: { id: string; label: string },
 ): Promise<BirthdayBonus | null> {
   const [row] = await db
     .update(birthdayBonuses)
-    .set({ status: "chosen", chosenOption, updatedAt: new Date() })
+    .set({
+      status: "chosen",
+      chosenOptionId: option.id,
+      chosenOption: option.label,
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(birthdayBonuses.id, bonusId),

@@ -1,4 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
+  bigint,
+  boolean,
   index,
   integer,
   pgEnum,
@@ -21,14 +24,32 @@ export const birthdayBonusStatus = pgEnum("birthday_bonus_status", [
   "declined",
 ]);
 
-export type BirthdayBonusOption =
-  | "manicure_tradicional"
-  | "veloterapia_exfoliacion";
+/**
+ * Opciones de bono de cumpleaños CONFIGURABLES por tenant (D-19, B1.1). Reemplaza
+ * el enum fijo `manicure/veloterapia` + las columnas `bonus_*_cop` del tenant, que
+ * cableaban la feature a un negocio concreto. Cada tenant define sus propias
+ * opciones (etiqueta + descuento en COP). Dinero en bigint (D-04).
+ */
+export const bonusOptions = pgTable(
+  "bonus_options",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    discountCop: bigint("discount_cop", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("bonus_options_tenant_active_idx").on(t.tenantId, t.active)],
+);
 
-export const BIRTHDAY_OPTION_LABELS: Record<BirthdayBonusOption, string> = {
-  manicure_tradicional: "Manicure tradicional",
-  veloterapia_exfoliacion: "Veloterapia con exfoliación",
-};
+export type BonusOption = typeof bonusOptions.$inferSelect;
 
 /**
  * Un bono de cumpleaños por clienta y año.
@@ -48,7 +69,11 @@ export const birthdayBonuses = pgTable(
     status: birthdayBonusStatus("status")
       .notNull()
       .default("pending_manicurist"),
-    /** 'manicure_tradicional' | 'veloterapia_exfoliacion' — se llena al elegir */
+    /** Opción elegida por la clienta (FK a bonus_options). set null si se borra. */
+    chosenOptionId: uuid("chosen_option_id").references(() => bonusOptions.id, {
+      onDelete: "set null",
+    }),
+    /** Snapshot de la etiqueta elegida (para mostrarla aunque la opción cambie/borre). */
     chosenOption: text("chosen_option"),
     publicToken: uuid("public_token").notNull().defaultRandom(),
     appointmentId: uuid("appointment_id").references(() => appointments.id, {

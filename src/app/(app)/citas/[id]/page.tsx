@@ -34,8 +34,8 @@ import { GcalSyncStatus } from "@/modules/calendar/components/gcal-sync-status";
 import {
   getActiveBonusForClient,
   getBonusForAppointment,
+  getBonusOption,
 } from "@/modules/birthdays/repository";
-import { BIRTHDAY_OPTION_LABELS } from "@/modules/birthdays/schema";
 import type { ReceiptData } from "@/modules/appointments/receipt";
 import {
   getAppointment,
@@ -152,12 +152,11 @@ export default async function CitaDetailPage({
   const locked = isLocked(appointment.status);
   const netTotal = appointment.totalCop - appointment.bonusDiscountCop;
   const saldo = netTotal - appointment.paidCop;
-  const bonusOptionValue =
-    birthdayBonus?.chosenOption === "manicure_tradicional"
-      ? (tenant?.bonusManicureCop ?? 0n)
-      : birthdayBonus?.chosenOption === "veloterapia_exfoliacion"
-        ? (tenant?.bonusVeloterapiaCop ?? 0n)
-        : 0n;
+  // Valor del bono elegido = descuento de la opción del catálogo (D-19, B1.1).
+  const chosenBonusOption = birthdayBonus?.chosenOptionId
+    ? await getBonusOption(tenantId, birthdayBonus.chosenOptionId)
+    : null;
+  const bonusOptionValue = chosenBonusOption?.discountCop ?? 0n;
   const durationMin = Math.round(
     (appointment.endsAt.getTime() - appointment.startsAt.getTime()) / 60_000,
   );
@@ -394,11 +393,7 @@ export default async function CitaDetailPage({
           </p>
           <p className="mt-0.5 text-pink-700">
             Regalo elegido:{" "}
-            <span className="font-semibold">
-              {BIRTHDAY_OPTION_LABELS[
-                birthdayBonus.chosenOption as keyof typeof BIRTHDAY_OPTION_LABELS
-              ] ?? birthdayBonus.chosenOption}
-            </span>
+            <span className="font-semibold">{birthdayBonus.chosenOption}</span>
             {appointment.bonusDiscountCop > 0n
               ? " — descuento aplicado a esta cita."
               : " — servicio gratis."}
@@ -430,9 +425,7 @@ export default async function CitaDetailPage({
           <p className="mt-0.5 text-pink-700">
             Regalo:{" "}
             <span className="font-semibold">
-              {BIRTHDAY_OPTION_LABELS[
-                redeemedBonus.chosenOption as keyof typeof BIRTHDAY_OPTION_LABELS
-              ] ?? redeemedBonus.chosenOption}
+              {redeemedBonus.chosenOption}
             </span>{" "}
             — descuento aplicado a esta cita. El bono quedó invalidado.
           </p>

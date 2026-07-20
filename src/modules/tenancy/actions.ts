@@ -13,7 +13,6 @@ import {
   createTenantWithOwner,
   getUserTenant,
   setAutoMessages,
-  updateBonusValues,
   updateTenantPublicInfo,
 } from "@/modules/tenancy/repository";
 import { createServices } from "@/modules/services/repository";
@@ -53,30 +52,8 @@ export async function updateBusinessPublicInfoAction(
   return { ok: true };
 }
 
-const bonusValuesSchema = z.object({
-  bonusManicureCop: z.number().int().min(0),
-  bonusVeloterapiaCop: z.number().int().min(0),
-});
-
-/** Guarda el valor fijo (COP) de cada opción de bono de cumpleaños. */
-export async function updateBonusValuesAction(
-  input: unknown,
-): Promise<ActionResult> {
-  const { tenantId } = await requireTenant();
-  const parsed = bonusValuesSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "Datos inválidos.",
-    };
-  }
-  await updateBonusValues(tenantId, {
-    bonusManicureCop: BigInt(parsed.data.bonusManicureCop),
-    bonusVeloterapiaCop: BigInt(parsed.data.bonusVeloterapiaCop),
-  });
-  revalidatePath("/ajustes");
-  return { ok: true };
-}
+// Los valores de bono ahora se gestionan como opciones por tenant (D-19, B1.1):
+// ver createBonusOptionAction / updateBonusOptionAction en modules/birthdays/actions.
 
 /** Activa/desactiva los mensajes automáticos de WhatsApp del negocio (F8.B2). */
 export async function setAutoMessagesAction(

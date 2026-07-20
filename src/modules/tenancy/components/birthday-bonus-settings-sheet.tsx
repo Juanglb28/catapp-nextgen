@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { MoneyInput } from "@/components/money-input";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
@@ -15,45 +16,71 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { updateBonusValuesAction } from "@/modules/tenancy/actions";
+import {
+  createBonusOptionAction,
+  updateBonusOptionAction,
+} from "@/modules/birthdays/actions";
 
+export type BonusOptionView = {
+  id: string;
+  label: string;
+  discountCop: number;
+  active: boolean;
+};
+
+/**
+ * Gestión de las opciones de bono de cumpleaños del negocio (D-19, B1.1).
+ * Reemplaza los dos valores fijos manicure/veloterapia por una lista editable:
+ * cada opción tiene nombre + descuento, y puede activarse/desactivarse.
+ */
 export function BirthdayBonusSettingsSheet({
-  initial,
+  options,
   trigger,
 }: {
-  initial: { bonusManicureCop: number; bonusVeloterapiaCop: number };
+  options: BonusOptionView[];
   trigger: ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [manicure, setManicure] = useState(initial.bonusManicureCop);
-  const [veloterapia, setVeloterapia] = useState(initial.bonusVeloterapiaCop);
+  const [label, setLabel] = useState("");
+  const [discount, setDiscount] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   function onOpenChange(next: boolean) {
     setOpen(next);
     if (next) {
-      setManicure(initial.bonusManicureCop);
-      setVeloterapia(initial.bonusVeloterapiaCop);
+      setLabel("");
+      setDiscount(0);
       setError(null);
     }
   }
 
-  async function submit() {
+  async function addOption() {
     setError(null);
-    setSubmitting(true);
-    const result = await updateBonusValuesAction({
-      bonusManicureCop: manicure,
-      bonusVeloterapiaCop: veloterapia,
+    setBusy(true);
+    const res = await createBonusOptionAction({
+      label,
+      discountCop: discount,
     });
-    setSubmitting(false);
-    if (!result.ok) {
-      setError(result.error);
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error);
       return;
     }
-    setOpen(false);
-    toast.success("Valores del bono actualizados");
+    setLabel("");
+    setDiscount(0);
+    toast.success("Opción agregada");
+    router.refresh();
+  }
+
+  async function toggleActive(opt: BonusOptionView) {
+    const res = await updateBonusOptionAction({ id: opt.id, active: !opt.active });
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success(opt.active ? "Opción desactivada" : "Opción activada");
     router.refresh();
   }
 
@@ -64,36 +91,79 @@ export function BirthdayBonusSettingsSheet({
         <SheetHeader>
           <SheetTitle>Bono de cumpleaños</SheetTitle>
           <SheetDescription>
-            Define cuánto se descuenta al aplicar cada bono en una cita.
+            Define las opciones de regalo que tus clientas pueden elegir, cada una
+            con su descuento.
           </SheetDescription>
         </SheetHeader>
-        <div className="space-y-4 px-4 pb-6">
-          <div className="space-y-2">
-            <Label htmlFor="bono-manicure">Manicure tradicional</Label>
-            <MoneyInput
-              id="bono-manicure"
-              value={manicure}
-              onChange={setManicure}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="bono-veloterapia">
-              Veloterapia con exfoliación
-            </Label>
-            <MoneyInput
-              id="bono-veloterapia"
-              value={veloterapia}
-              onChange={setVeloterapia}
-            />
-          </div>
-          {error ? (
-            <p className="text-destructive text-sm" role="alert">
-              {error}
+        <div className="space-y-5 px-4 pb-6">
+          {options.length > 0 ? (
+            <ul className="space-y-2">
+              {options.map((opt) => (
+                <li
+                  key={opt.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{opt.label}</p>
+                    <p className="text-muted-foreground text-xs">
+                      {new Intl.NumberFormat("es-CO", {
+                        style: "currency",
+                        currency: "COP",
+                        maximumFractionDigits: 0,
+                      }).format(opt.discountCop)}
+                      {opt.active ? "" : " · inactiva"}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11 shrink-0"
+                    onClick={() => toggleActive(opt)}
+                  >
+                    {opt.active ? "Desactivar" : "Activar"}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Aún no tienes opciones de bono. Agrega la primera abajo.
             </p>
-          ) : null}
-          <Button className="w-full" disabled={submitting} onClick={submit}>
-            {submitting ? "Guardando…" : "Guardar"}
-          </Button>
+          )}
+
+          <div className="space-y-3 border-t pt-4">
+            <p className="text-sm font-medium">Agregar opción</p>
+            <div className="space-y-2">
+              <Label htmlFor="bono-label">Nombre</Label>
+              <Input
+                id="bono-label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="Ej: Manicure tradicional"
+                maxLength={80}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bono-discount">Descuento</Label>
+              <MoneyInput
+                id="bono-discount"
+                value={discount}
+                onChange={setDiscount}
+              />
+            </div>
+            {error ? (
+              <p className="text-destructive text-sm" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <Button
+              className="min-h-11 w-full"
+              disabled={busy || label.trim().length === 0}
+              onClick={addOption}
+            >
+              {busy ? "Guardando…" : "Agregar opción"}
+            </Button>
+          </div>
         </div>
       </SheetContent>
     </Sheet>

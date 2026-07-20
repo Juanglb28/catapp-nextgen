@@ -12,6 +12,7 @@ import { requireTenant } from "@/modules/tenancy/context";
 import { getTenant } from "@/modules/tenancy/repository";
 import {
   getActiveBonusForClient,
+  getBonusOption,
   redeemBirthdayBonus,
 } from "@/modules/birthdays/repository";
 
@@ -360,22 +361,18 @@ export async function applyBirthdayBonusAction(
   if (!appointment) return { ok: false, error: "No se encontró la cita." };
 
   const bonus = await getActiveBonusForClient(tenantId, appointment.clientId);
-  if (!bonus || bonus.status !== "chosen" || !bonus.chosenOption) {
+  if (!bonus || bonus.status !== "chosen" || !bonus.chosenOptionId) {
     return { ok: false, error: "La clienta no tiene un bono elegido." };
   }
 
-  const tenant = await getTenant(tenantId);
-  const value =
-    bonus.chosenOption === "manicure_tradicional"
-      ? (tenant?.bonusManicureCop ?? 0n)
-      : bonus.chosenOption === "veloterapia_exfoliacion"
-        ? (tenant?.bonusVeloterapiaCop ?? 0n)
-        : 0n;
+  // El descuento sale de la opción elegida (D-19, B1.1), no de columnas fijas.
+  const option = await getBonusOption(tenantId, bonus.chosenOptionId);
+  const value = option?.discountCop ?? 0n;
 
   if (value <= 0n) {
     return {
       ok: false,
-      error: "Configura el valor del bono en Ajustes → Bono de cumpleaños.",
+      error: "Configura el valor de la opción en Ajustes → Bono de cumpleaños.",
     };
   }
 

@@ -15,7 +15,6 @@ import {
   listAppointmentsByClient,
 } from "@/modules/appointments/repository";
 import { getActiveBonusForClient } from "@/modules/birthdays/repository";
-import { BIRTHDAY_OPTION_LABELS } from "@/modules/birthdays/schema";
 import { ClientDetailActions } from "@/modules/clients/components/client-detail-actions";
 import { OptOutToggle } from "@/modules/clients/components/opt-out-toggle";
 import { getClient } from "@/modules/clients/repository";
@@ -138,10 +137,7 @@ export default async function ClientDetailPage({
               )}
               {activeBonus.status === "chosen" && (
                 <Badge className="bg-green-100 text-green-800">
-                  🎂{" "}
-                  {BIRTHDAY_OPTION_LABELS[
-                    activeBonus.chosenOption as keyof typeof BIRTHDAY_OPTION_LABELS
-                  ] ?? activeBonus.chosenOption}
+                  🎂 {activeBonus.chosenOption}
                 </Badge>
               )}
             </span>

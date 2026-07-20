@@ -3,10 +3,6 @@ import { headers } from "next/headers";
 import { requireTenant } from "@/modules/tenancy/context";
 import { getTenant } from "@/modules/tenancy/repository";
 import { listPendingBonuses } from "@/modules/birthdays/repository";
-import {
-  BIRTHDAY_OPTION_LABELS,
-  type BirthdayBonusOption,
-} from "@/modules/birthdays/schema";
 import { buildWaLink, renderTemplate } from "@/modules/whatsapp/templates";
 import { getTemplates } from "@/modules/whatsapp/repository";
 import { BonusCard } from "./bonus-card";
@@ -53,12 +49,8 @@ export default async function CumpleanosPage() {
               link: bonusUrl,
             });
             const waHref = buildWaLink(bonus.clientPhone, waText);
-            const chosenLabel =
-              bonus.chosenOption && bonus.chosenOption in BIRTHDAY_OPTION_LABELS
-                ? BIRTHDAY_OPTION_LABELS[
-                    bonus.chosenOption as BirthdayBonusOption
-                  ]
-                : (bonus.chosenOption ?? null);
+            // chosenOption ya es la etiqueta (snapshot) tras B1.1.
+            const chosenLabel = bonus.chosenOption ?? null;
 
             return (
               <BonusCard

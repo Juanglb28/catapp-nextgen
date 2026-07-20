@@ -1,6 +1,4 @@
-import { sql } from "drizzle-orm";
 import {
-  bigint,
   boolean,
   pgTable,
   text,
@@ -22,13 +20,8 @@ export const tenants = pgTable("tenants", {
   publicNote: text("public_note"),
   // Confirmaciones y recordatorios automáticos por WhatsApp (F8.B2).
   autoMessages: boolean("auto_messages").notNull().default(true),
-  // Valor fijo (COP) de cada opción de bono de cumpleaños. 0 = sin configurar.
-  bonusManicureCop: bigint("bonus_manicure_cop", { mode: "bigint" })
-    .notNull()
-    .default(sql`0`),
-  bonusVeloterapiaCop: bigint("bonus_veloterapia_cop", { mode: "bigint" })
-    .notNull()
-    .default(sql`0`),
+  // Los valores de bono ya NO viven aquí: son opciones por tenant en
+  // `bonus_options` (D-19, B1.1). Columnas bonus_*_cop eliminadas en 0026.
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -38,7 +31,7 @@ export const tenants = pgTable("tenants", {
 // (owner). No había ningún control que distinguiera owner/staff, así que el enum
 // solo daba una falsa sensación de permisos (06-SEG H-02). La tabla memberships
 // se conserva como relación user↔tenant; la columna `role` y el enum `member_role`
-// se eliminan en la migración 0026.
+// se eliminan en la migración 0025 (consolidada).
 export const memberships = pgTable(
   "memberships",
   {

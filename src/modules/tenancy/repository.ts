@@ -11,14 +11,6 @@ export async function updateTenantPublicInfo(
   await db.update(tenants).set(data).where(eq(tenants.id, tenantId));
 }
 
-/** Activa/desactiva los mensajes automáticos de WhatsApp del tenant (F8.B2). */
-export async function updateBonusValues(
-  tenantId: string,
-  data: { bonusManicureCop: bigint; bonusVeloterapiaCop: bigint },
-): Promise<void> {
-  await db.update(tenants).set(data).where(eq(tenants.id, tenantId));
-}
-
 export async function setAutoMessages(
   tenantId: string,
   enabled: boolean,
