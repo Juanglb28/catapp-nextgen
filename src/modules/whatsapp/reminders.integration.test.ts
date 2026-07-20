@@ -22,6 +22,11 @@ describe.runIf(TEST_DB)(
     let tenantB: string;
     const now = new Date();
     const at = (h: number) => new Date(now.getTime() + h * 3_600_000);
+    // Teléfono único por clienta: hay un unique (tenant_id, phone) desde 0020,
+    // así que cada seedAppt debe usar un número distinto.
+    let phoneSeq = 0;
+    const nextPhone = () =>
+      `+5730011${String(10000 + phoneSeq++).slice(-5)}`;
 
     async function seedAppt(
       tenantId: string,
@@ -32,7 +37,7 @@ describe.runIf(TEST_DB)(
       const apptRepo = await import("@/modules/appointments/repository");
       const client = await clientsRepo.createClient(tenantId, {
         name: "Clienta",
-        phone: "+573001112233",
+        phone: nextPhone(),
         email: null,
         notes: null,
       });

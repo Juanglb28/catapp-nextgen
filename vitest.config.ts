@@ -15,6 +15,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
+    // Migra la base de integración (si TEST_DATABASE_URL está definida) antes de
+    // los tests, de forma determinista. Ver src/test/global-setup.ts (B2.4).
+    globalSetup: ["./src/test/global-setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
   resolve: {

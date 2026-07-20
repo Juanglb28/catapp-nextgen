@@ -58,7 +58,7 @@ describe.runIf(TEST_DB)("getPublicAppointment (integración)", () => {
     await closeDb();
   });
 
-  it("token válido devuelve solo datos públicos (sin precios ni teléfono)", async () => {
+  it("token válido devuelve datos públicos (incluye precios por D-18, nunca el teléfono)", async () => {
     const repo = await import("./repository");
     const appt = await createAppt();
 
@@ -66,10 +66,16 @@ describe.runIf(TEST_DB)("getPublicAppointment (integración)", () => {
     expect(pub).not.toBeNull();
     expect(pub?.business.name).toBe("Uñas de Susana");
     expect(pub?.clientFirstName).toBe("Ana");
-    expect(pub?.services).toEqual([{ name: "Manicure", quantity: 2 }]);
-    // El DTO no incluye precios ni teléfono de la clienta.
-    expect(JSON.stringify(pub)).not.toContain("25000");
-    expect(JSON.stringify(pub)).not.toContain("573001112233");
+    // D-18: la página pública muestra montos (transparencia). El DTO incluye el
+    // nombre, cantidad y precio de cada servicio.
+    expect(pub?.services).toEqual([
+      { name: "Manicure", quantity: 2, priceCop: 25000n },
+    ]);
+    // El teléfono de la clienta NUNCA es público (stringify seguro para bigint).
+    const json = JSON.stringify(pub, (_k, v) =>
+      typeof v === "bigint" ? v.toString() : v,
+    );
+    expect(json).not.toContain("573001112233");
   });
 
   it("incluye la dirección y nota públicas del negocio", async () => {
