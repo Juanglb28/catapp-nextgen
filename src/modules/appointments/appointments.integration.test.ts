@@ -142,6 +142,27 @@ describe.runIf(TEST_DB)("repositorio de citas (integración)", () => {
     expect(p2?.paymentStatus).toBe("paid");
   });
 
+  it("pagos concurrentes no se pisan: FOR UPDATE serializa (B2.1, QA B1)", async () => {
+    const repo = await import("./repository");
+    const appt = await createBasic(); // total 60000
+
+    // Dos pagos de 30000 a la vez. Con read-modify-write fuera de la tx uno se
+    // perdía (paid=30000). Con FOR UPDATE dentro de la tx, se suman: paid=60000.
+    await Promise.all([
+      repo.registerPayment(tenantA, appt.id, 30000n, userAId),
+      repo.registerPayment(tenantA, appt.id, 30000n, userAId),
+    ]);
+
+    const after = await repo.getAppointment(tenantA, appt.id);
+    expect(after?.paidCop).toBe(60000n);
+    expect(after?.paymentStatus).toBe("paid");
+
+    // Y la auditoría registró las dos entradas de pago (ninguna se perdió).
+    const history = await repo.getAppointmentHistory(tenantA, appt.id);
+    const paidChanges = history.filter((h) => h.field === "paid_cop");
+    expect(paidChanges).toHaveLength(2);
+  });
+
   it("setPaidAmount FIJA el monto exacto (corrige un pago duplicado)", async () => {
     const repo = await import("./repository");
     const appt = await createBasic(); // total 60000

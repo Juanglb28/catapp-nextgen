@@ -741,7 +741,12 @@ export async function updateAppointment(
   });
 }
 
-/** Suma un pago a la cita y deriva el estado de pago. */
+/**
+ * Suma un pago a la cita y deriva el estado de pago. ATÓMICO (B2.1): la fila se
+ * lee con `FOR UPDATE` DENTRO de la transacción, así dos pagos concurrentes se
+ * serializan y ninguno pisa al otro (antes el read-modify-write fuera de la tx
+ * perdía un pago — QA B1).
+ */
 export async function registerPayment(
   tenantId: string,
   id: string,
@@ -750,21 +755,22 @@ export async function registerPayment(
   tip: bigint = 0n,
   paymentMethod?: "efectivo" | "transferencia" | null,
 ): Promise<Appointment | null> {
-  const [current] = await db
-    .select()
-    .from(appointments)
-    .where(and(eq(appointments.tenantId, tenantId), eq(appointments.id, id)))
-    .limit(1);
-  if (!current) return null;
-
-  const nextPaid = current.paidCop + amount;
-  const nextTip = current.tipCop + tip;
-  const nextPayment = derivePaymentStatus(
-    current.totalCop - current.bonusDiscountCop,
-    nextPaid,
-  );
-
   return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(appointments)
+      .where(and(eq(appointments.tenantId, tenantId), eq(appointments.id, id)))
+      .for("update")
+      .limit(1);
+    if (!current) return null;
+
+    const nextPaid = current.paidCop + amount;
+    const nextTip = current.tipCop + tip;
+    const nextPayment = derivePaymentStatus(
+      current.totalCop - current.bonusDiscountCop,
+      nextPaid,
+    );
+
     const [updated] = await tx
       .update(appointments)
       .set({
@@ -815,21 +821,22 @@ export async function setPaidAmount(
     paymentMethod?: "efectivo" | "transferencia" | null;
   } = {},
 ): Promise<Appointment | null> {
-  const [current] = await db
-    .select()
-    .from(appointments)
-    .where(and(eq(appointments.tenantId, tenantId), eq(appointments.id, id)))
-    .limit(1);
-  if (!current) return null;
-
-  const nextPaid = paidCop < 0n ? 0n : paidCop;
-  const nextTip = opts.tip === undefined ? current.tipCop : opts.tip;
-  const nextPayment = derivePaymentStatus(
-    current.totalCop - current.bonusDiscountCop,
-    nextPaid,
-  );
-
   return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(appointments)
+      .where(and(eq(appointments.tenantId, tenantId), eq(appointments.id, id)))
+      .for("update")
+      .limit(1);
+    if (!current) return null;
+
+    const nextPaid = paidCop < 0n ? 0n : paidCop;
+    const nextTip = opts.tip === undefined ? current.tipCop : opts.tip;
+    const nextPayment = derivePaymentStatus(
+      current.totalCop - current.bonusDiscountCop,
+      nextPaid,
+    );
+
     const [updated] = await tx
       .update(appointments)
       .set({
@@ -915,25 +922,26 @@ export async function setBonusDiscount(
   bonusDiscountCop: bigint,
   changedBy: string | null = null,
 ): Promise<Appointment | null> {
-  const [current] = await db
-    .select()
-    .from(appointments)
-    .where(and(eq(appointments.tenantId, tenantId), eq(appointments.id, id)))
-    .limit(1);
-  if (!current) return null;
-
-  const capped =
-    bonusDiscountCop < 0n
-      ? 0n
-      : bonusDiscountCop > current.totalCop
-        ? current.totalCop
-        : bonusDiscountCop;
-  const nextPayment = derivePaymentStatus(
-    current.totalCop - capped,
-    current.paidCop,
-  );
-
   return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(appointments)
+      .where(and(eq(appointments.tenantId, tenantId), eq(appointments.id, id)))
+      .for("update")
+      .limit(1);
+    if (!current) return null;
+
+    const capped =
+      bonusDiscountCop < 0n
+        ? 0n
+        : bonusDiscountCop > current.totalCop
+          ? current.totalCop
+          : bonusDiscountCop;
+    const nextPayment = derivePaymentStatus(
+      current.totalCop - capped,
+      current.paidCop,
+    );
+
     const [updated] = await tx
       .update(appointments)
       .set({

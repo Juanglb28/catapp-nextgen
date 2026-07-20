@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { formatTime, tenantLocalToUtc } from "@/lib/dates";
+import { formatCOP } from "@/lib/money";
 import { syncAppointment } from "@/modules/calendar/sync";
 import { maybeSendAppointmentConfirmation } from "@/modules/whatsapp/auto-send";
 import { getClient } from "@/modules/clients/repository";
@@ -272,6 +273,22 @@ export async function registerPaymentAction(
     return {
       ok: false,
       error: parsed.error.issues[0]?.message ?? "Monto inválido.",
+    };
+  }
+
+  // Tope: el pago no puede exceder el saldo pendiente (neto = total − bono − pagado).
+  // Evita registrar paid_cop > total, que inflaría los ingresos (QA B1). B2.1.
+  const appointment = await getAppointment(tenantId, id);
+  if (!appointment) return { ok: false, error: "No se encontró la cita." };
+  const saldo =
+    appointment.totalCop - appointment.bonusDiscountCop - appointment.paidCop;
+  if (BigInt(parsed.data.amount) > saldo) {
+    return {
+      ok: false,
+      error:
+        saldo <= 0n
+          ? "Esta cita ya está pagada."
+          : `El monto excede el saldo pendiente (${formatCOP(saldo)}).`,
     };
   }
 
