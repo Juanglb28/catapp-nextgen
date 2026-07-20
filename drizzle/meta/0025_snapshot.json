@@ -1,5 +1,5 @@
 {
-  "id": "936a1c4e-111c-4e5a-9dab-8d86af894dc0",
+  "id": "fa777700-cac6-461d-aee3-965a907ce79b",
   "prevId": "6919e511-833b-40db-8972-e36a7ecbefa9",
   "version": "7",
   "dialect": "postgresql",
@@ -922,13 +922,13 @@
           "name": "clients_birthday_month_day_idx",
           "columns": [
             {
-              "expression": "EXTRACT(MONTH FROM \"birthday_date\")",
+              "expression": "(EXTRACT(MONTH FROM \"birthday_date\"))",
               "asc": true,
               "isExpression": true,
               "nulls": "last"
             },
             {
-              "expression": "EXTRACT(DAY FROM \"birthday_date\")",
+              "expression": "(EXTRACT(DAY FROM \"birthday_date\"))",
               "asc": true,
               "isExpression": true,
               "nulls": "last"
@@ -1434,14 +1434,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
-        },
-        "role": {
-          "name": "role",
-          "type": "member_role",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'owner'"
         },
         "created_at": {
           "name": "created_at",
@@ -2182,14 +2174,6 @@
         "in",
         "out",
         "adjust"
-      ]
-    },
-    "public.member_role": {
-      "name": "member_role",
-      "schema": "public",
-      "values": [
-        "owner",
-        "staff"
       ]
     },
     "public.wa_message_status": {

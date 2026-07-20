@@ -180,15 +180,8 @@
     {
       "idx": 25,
       "version": "7",
-      "when": 1784501522605,
-      "tag": "0025_perf_indexes",
-      "breakpoints": true
-    },
-    {
-      "idx": 26,
-      "version": "7",
-      "when": 1784502915727,
-      "tag": "0026_drop_member_role",
+      "when": 1784506637239,
+      "tag": "0025_b0_b1_schema",
       "breakpoints": true
     }
   ]

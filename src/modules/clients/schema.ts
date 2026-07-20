@@ -52,8 +52,10 @@ export const clients = pgTable(
     // de expresión parcial para no escanear clientas sin cumpleaños ni archivadas. (B0.1)
     index("clients_birthday_month_day_idx")
       .on(
-        sql`EXTRACT(MONTH FROM ${t.birthdayDate})`,
-        sql`EXTRACT(DAY FROM ${t.birthdayDate})`,
+        // Paréntesis obligatorios: en un CREATE INDEX, una expresión EXTRACT(... FROM ...)
+        // sin paréntesis propios da "syntax error at or near FROM" en Postgres.
+        sql`(EXTRACT(MONTH FROM ${t.birthdayDate}))`,
+        sql`(EXTRACT(DAY FROM ${t.birthdayDate}))`,
       )
       .where(
         sql`${t.birthdayDate} IS NOT NULL AND ${t.archivedAt} IS NULL`,
