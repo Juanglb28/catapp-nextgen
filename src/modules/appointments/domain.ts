@@ -55,6 +55,12 @@ export function validateTimeRange(startsAt: Date, endsAt: Date): boolean {
  * Una cita queda "bloqueada" (solo lectura, salvo registrar pagos) cuando está
  * cancelada. Las citas completadas SÍ permiten edición posterior (RF-07).
  */
+/**
+ * Una cita queda "bloqueada" (read-only salvo registrar pago) cuando ya está
+ * cerrada: cancelada o completada. Los pagos se registran por su propia acción,
+ * que NO consulta isLocked (se puede cobrar después de completar). Coherente con
+ * ESTADO.md ("completadas/canceladas quedan read-only salvo pago").
+ */
 export function isLocked(status: string): boolean {
-  return status === "cancelled";
+  return status === "cancelled" || status === "completed";
 }

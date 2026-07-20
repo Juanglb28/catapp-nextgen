@@ -351,7 +351,7 @@ export async function monthlyRows(
 
   const summaryByAppt = new Map<string, string[]>();
   for (const l of lines) {
-    const label = l.quantity > 1 ? `${l.name} x${l.quantity}` : l.name;
+    const label = l.quantity > 1 ? `${l.name} ×${l.quantity}` : l.name;
     const arr = summaryByAppt.get(l.appointmentId) ?? [];
     arr.push(label);
     summaryByAppt.set(l.appointmentId, arr);

@@ -63,6 +63,13 @@ export async function createAppointmentAction(
   }
   const data = parsed.data;
 
+  // Aislamiento: la clienta debe pertenecer al tenant. Se valida aquí para
+  // devolver {ok:false} en vez de dejar que el repo lance (audit H-2, B2.3).
+  const client = await getClient(tenantId, data.clientId);
+  if (!client) {
+    return { ok: false, error: "La clienta no pertenece a este negocio." };
+  }
+
   const tenant = await getTenant(tenantId);
   const tz = tenant?.timezone ?? "America/Bogota";
 
@@ -183,7 +190,7 @@ export async function editAppointmentAction(
   if (isLocked(appointment.status)) {
     return {
       ok: false,
-      error: "La cita cancelada no se puede editar.",
+      error: "Una cita completada o cancelada no se puede editar.",
     };
   }
 

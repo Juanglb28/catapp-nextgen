@@ -8,11 +8,11 @@ import {
 } from "./domain";
 
 describe("isLocked", () => {
-  it("solo cancelada está bloqueada", () => {
+  it("cancelada y completada están bloqueadas (read-only salvo pago)", () => {
     expect(isLocked("cancelled")).toBe(true);
+    expect(isLocked("completed")).toBe(true);
   });
-  it("completada, agendada y no asistió NO están bloqueadas", () => {
-    expect(isLocked("completed")).toBe(false);
+  it("agendada y no asistió NO están bloqueadas", () => {
     expect(isLocked("scheduled")).toBe(false);
     expect(isLocked("no_show")).toBe(false);
   });
