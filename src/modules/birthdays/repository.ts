@@ -1,5 +1,6 @@
 import { and, count, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
+import { tenantDayKey } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { clients } from "@/modules/clients/schema";
 
@@ -104,8 +105,11 @@ export async function listPendingBonuses(
 export async function getActiveBonusForClient(
   tenantId: string,
   clientId: string,
+  tz: string = "America/Bogota",
 ): Promise<BirthdayBonus | null> {
-  const year = new Date().getFullYear();
+  // Año en la TZ del tenant (D-05): en UTC, la noche del 31-dic ya es el año
+  // siguiente y no encontraría el bono del año en curso (QA B3).
+  const year = Number(tenantDayKey(new Date(), tz).slice(0, 4));
   const rows = await db
     .select()
     .from(birthdayBonuses)

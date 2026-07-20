@@ -14,6 +14,9 @@ import {
 
 import { tenantDayRangeUtc, shiftDayKey, tenantDayKey } from "@/lib/dates";
 import { db } from "@/lib/db";
+// Solo el schema (tabla) de birthdays, para redimir el bono en la misma
+// transacción que el descuento (B2.2). No importa código de birthdays → sin ciclo.
+import { birthdayBonuses } from "@/modules/birthdays/schema";
 import { type Client, clients } from "@/modules/clients/schema";
 import { type Service, services } from "@/modules/services/schema";
 import { tenants } from "@/modules/tenancy/schema";
@@ -955,6 +958,101 @@ export async function setBonusDiscount(
     if (capped !== current.bonusDiscountCop) {
       await tx.insert(appointmentChanges).values({
         appointmentId: id,
+        changedBy,
+        field: "bonus_discount_cop",
+        oldValue: String(current.bonusDiscountCop),
+        newValue: String(capped),
+      });
+    }
+
+    return updated;
+  });
+}
+
+/**
+ * Aplica el descuento del bono a la cita Y redime el bono (chosen → redeemed) en
+ * UNA SOLA transacción (B2.2). Antes eran dos operaciones separadas con
+ * compensación best-effort (QA B2): si el proceso moría entre ambas quedaba el
+ * descuento aplicado con el bono sin consumir. Ahora es todo-o-nada: si la
+ * redención no afecta ninguna fila (el bono no está 'chosen'), se lanza y la
+ * transacción revierte el descuento.
+ *
+ * Nota de arquitectura: toca dos tablas de módulos distintos (appointments +
+ * birthday_bonuses). Se coordina aquí por transaccionalidad; en B4 se moverá a un
+ * evento de dominio (R-D3). Solo importa el SCHEMA de birthdays (sin ciclo de
+ * código ejecutable).
+ */
+export async function applyBonusDiscountAndRedeem(
+  tenantId: string,
+  params: {
+    appointmentId: string;
+    bonusId: string;
+    discountCop: bigint;
+    changedBy?: string | null;
+  },
+): Promise<Appointment | null> {
+  const { appointmentId, bonusId, discountCop, changedBy = null } = params;
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.tenantId, tenantId),
+          eq(appointments.id, appointmentId),
+        ),
+      )
+      .for("update")
+      .limit(1);
+    if (!current) return null;
+
+    const capped =
+      discountCop < 0n
+        ? 0n
+        : discountCop > current.totalCop
+          ? current.totalCop
+          : discountCop;
+    const nextPayment = derivePaymentStatus(
+      current.totalCop - capped,
+      current.paidCop,
+    );
+
+    // 1) Redime el bono PRIMERO (guard de estado): si no está 'chosen', 0 filas
+    //    → lanzamos y se revierte todo. Evita descuento sin bono consumido.
+    const redeemed = await tx
+      .update(birthdayBonuses)
+      .set({ status: "redeemed", appointmentId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(birthdayBonuses.tenantId, tenantId),
+          eq(birthdayBonuses.id, bonusId),
+          eq(birthdayBonuses.status, "chosen"),
+        ),
+      )
+      .returning({ id: birthdayBonuses.id });
+    if (redeemed.length === 0) {
+      throw new Error("bonus_not_redeemable");
+    }
+
+    // 2) Aplica el descuento a la cita + auditoría.
+    const [updated] = await tx
+      .update(appointments)
+      .set({
+        bonusDiscountCop: capped,
+        paymentStatus: nextPayment,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(appointments.tenantId, tenantId),
+          eq(appointments.id, appointmentId),
+        ),
+      )
+      .returning();
+
+    if (capped !== current.bonusDiscountCop) {
+      await tx.insert(appointmentChanges).values({
+        appointmentId,
         changedBy,
         field: "bonus_discount_cop",
         oldValue: String(current.bonusDiscountCop),

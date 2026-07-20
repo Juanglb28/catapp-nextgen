@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { formatTime, tenantLocalToUtc } from "@/lib/dates";
+import { formatTime, tenantDayKey, tenantLocalToUtc } from "@/lib/dates";
 import { formatCOP } from "@/lib/money";
 import { syncAppointment } from "@/modules/calendar/sync";
 import { maybeSendAppointmentConfirmation } from "@/modules/whatsapp/auto-send";
@@ -14,11 +14,11 @@ import { getTenant } from "@/modules/tenancy/repository";
 import {
   getActiveBonusForClient,
   getBonusOption,
-  redeemBirthdayBonus,
 } from "@/modules/birthdays/repository";
 
 import { isLocked } from "./domain";
 import {
+  applyBonusDiscountAndRedeem,
   cancelAppointment,
   createAppointment,
   findOverlappingAppointments,
@@ -373,20 +373,38 @@ export async function updatePaymentMethodAction(
 }
 
 /**
- * Aplica el bono de cumpleaños elegido por la clienta como descuento de la
- * cita, usando el valor fijo configurado en Ajustes para esa opción.
+ * Aplica el bono de cumpleaños elegido por la clienta como descuento de la cita.
+ * B2.2: (1) el año del bono se resuelve en la TZ del tenant; (2) solo puede
+ * aplicarse durante el MES de cumpleaños de la clienta (promesa "redimible en el
+ * mes de tu cumpleaños"); (3) el descuento y la redención ocurren en UNA sola
+ * transacción (todo-o-nada), sin dejar descuento aplicado con el bono sin consumir.
  */
 export async function applyBirthdayBonusAction(
   id: string,
 ): Promise<ActionResult> {
   const { tenantId, userId } = await requireTenant();
 
-  const appointment = await getAppointment(tenantId, id);
+  const [appointment, tenant] = await Promise.all([
+    getAppointment(tenantId, id),
+    getTenant(tenantId),
+  ]);
   if (!appointment) return { ok: false, error: "No se encontró la cita." };
+  const tz = tenant?.timezone ?? "America/Bogota";
 
-  const bonus = await getActiveBonusForClient(tenantId, appointment.clientId);
+  const bonus = await getActiveBonusForClient(tenantId, appointment.clientId, tz);
   if (!bonus || bonus.status !== "chosen" || !bonus.chosenOptionId) {
     return { ok: false, error: "La clienta no tiene un bono elegido." };
+  }
+
+  // Caducidad (B2.2): solo redimible durante el mes de cumpleaños (TZ del tenant).
+  const client = await getClient(tenantId, appointment.clientId);
+  const birthdayMonth = client?.birthdayDate?.slice(5, 7);
+  const currentMonth = tenantDayKey(new Date(), tz).slice(5, 7);
+  if (birthdayMonth && birthdayMonth !== currentMonth) {
+    return {
+      ok: false,
+      error: "El bono solo puede aplicarse durante el mes de cumpleaños.",
+    };
   }
 
   // El descuento sale de la opción elegida (D-19, B1.1), no de columnas fijas.
@@ -400,19 +418,18 @@ export async function applyBirthdayBonusAction(
     };
   }
 
-  const updated = await setBonusDiscount(tenantId, id, value, userId);
-  if (!updated) return { ok: false, error: "No se encontró la cita." };
-
-  // Redime el bono (chosen → redeemed) para que quede invalidado y no pueda
-  // reutilizarse en otra cita. Si falla (carrera o estado inesperado), se
-  // revierte el descuento para no dejar dinero aplicado sin consumir el bono.
-  const redeemed = await redeemBirthdayBonus(tenantId, bonus.id, id);
-  if (!redeemed) {
-    await setBonusDiscount(tenantId, id, 0n, userId);
-    return {
-      ok: false,
-      error: "No se pudo redimir el bono. Intenta de nuevo.",
-    };
+  // Descuento + redención en UNA transacción (B2.2). Si el bono ya no está
+  // 'chosen' (carrera), lanza y revierte todo.
+  try {
+    const updated = await applyBonusDiscountAndRedeem(tenantId, {
+      appointmentId: id,
+      bonusId: bonus.id,
+      discountCop: value,
+      changedBy: userId,
+    });
+    if (!updated) return { ok: false, error: "No se encontró la cita." };
+  } catch {
+    return { ok: false, error: "No se pudo aplicar el bono. Intenta de nuevo." };
   }
 
   revalidateAppointment(id);
