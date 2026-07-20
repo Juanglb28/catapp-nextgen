@@ -1,5 +1,6 @@
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
@@ -8,6 +9,7 @@ import {
   dayKeyDayNumber,
   formatDayKeyLong,
   formatDayKeyWeekday,
+  formatTime,
   shiftDayKey,
   tenantDayKey,
   tenantDayRangeUtc,
@@ -21,10 +23,56 @@ import {
 } from "@/modules/appointments/agenda";
 import { AgendaCard } from "@/modules/appointments/components/agenda-card";
 import {
+  type AgendaAppointment,
   hasScheduledInRange,
   listAppointmentsForAgenda,
 } from "@/modules/appointments/repository";
 import { getTenantCached, requireTenant } from "@/modules/tenancy/context";
+import { getTemplates } from "@/modules/whatsapp/repository";
+import { buildWaLink, renderTemplate } from "@/modules/whatsapp/templates";
+
+/**
+ * Construye el mapa de enlaces wa.me de recordatorio para las citas agendadas
+ * de mañana (QW-5). Reutiliza la plantilla `reminder` y el link público.
+ */
+async function buildReminderLinks(
+  tenantId: string,
+  tz: string,
+  appts: AgendaAppointment[],
+  dayLabel: string,
+): Promise<Map<string, string>> {
+  const scheduled = appts.filter((a) => a.status === "scheduled");
+  if (scheduled.length === 0) return new Map();
+
+  const [tenant, templates, headersList] = await Promise.all([
+    getTenantCached(tenantId),
+    getTemplates(tenantId),
+    headers(),
+  ]);
+  const host = headersList.get("host") ?? "";
+  const proto = host.startsWith("localhost") ? "http" : "https";
+  const baseUrl = host ? `${proto}://${host}` : "";
+  const negocio = tenant?.name ?? "";
+
+  return new Map(
+    scheduled.map((a) => [
+      a.id,
+      buildWaLink(
+        a.clientPhone,
+        renderTemplate(templates.reminder, {
+          clienta: a.clientName,
+          negocio,
+          fecha: dayLabel,
+          hora: formatTime(a.startsAt, tz),
+          servicios: a.serviceSummary
+            .map((s) => (s.quantity > 1 ? `${s.name} ×${s.quantity}` : s.name))
+            .join(", "),
+          link: baseUrl ? `${baseUrl}/cita/${a.publicToken}` : "",
+        }),
+      ),
+    ]),
+  );
+}
 
 export const metadata: Metadata = { title: "Citas" };
 
@@ -259,6 +307,11 @@ async function DayView({
   const summary = daySummary(dayAppts);
   const isTomorrow = selected === tomorrow;
 
+  // Recordatorios wa.me de un toque solo para las citas de mañana (QW-5).
+  const reminderLinks = isTomorrow
+    ? await buildReminderLinks(tenantId, tz, dayAppts, formatDayKeyLong(selected))
+    : new Map<string, string>();
+
   return (
     <div>
       {/* Alerta si el dia seleccionado es manana */}
@@ -366,7 +419,11 @@ async function DayView({
         <ul className="space-y-2">
           {dayAppts.map((appt) => (
             <li key={appt.id}>
-              <AgendaCard appt={appt} tz={tz} />
+              <AgendaCard
+                appt={appt}
+                tz={tz}
+                reminderHref={reminderLinks.get(appt.id)}
+              />
             </li>
           ))}
         </ul>

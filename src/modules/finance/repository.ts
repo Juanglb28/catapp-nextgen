@@ -48,6 +48,7 @@ export type PendingPayment = {
   appointmentId: string;
   clientId: string;
   clientName: string;
+  clientPhone: string;
   startsAt: Date;
   total: bigint;
   paid: bigint;
@@ -217,8 +218,10 @@ export async function pendingPayments(
       appointmentId: appointments.id,
       clientId: clients.id,
       clientName: clients.name,
+      clientPhone: clients.phone,
       startsAt: appointments.startsAt,
       total: appointments.totalCop,
+      bonusDiscount: appointments.bonusDiscountCop,
       paid: appointments.paidCop,
     })
     .from(appointments)
@@ -236,10 +239,12 @@ export async function pendingPayments(
     appointmentId: r.appointmentId,
     clientId: r.clientId,
     clientName: r.clientName,
+    clientPhone: r.clientPhone,
     startsAt: r.startsAt,
     total: r.total,
     paid: r.paid,
-    saldo: r.total - r.paid,
+    // Saldo neto: descuenta el bono aplicado (coherente con el WHERE).
+    saldo: r.total - r.bonusDiscount - r.paid,
   }));
 }
 

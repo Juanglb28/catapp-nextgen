@@ -1,3 +1,4 @@
+import { MessageCircle } from "lucide-react";
 import Link from "next/link";
 
 import { formatTime } from "@/lib/dates";
@@ -26,9 +27,12 @@ const STATUS_TAG: Record<string, { label: string; cls: string }> = {
 export function AgendaCard({
   appt,
   tz,
+  reminderHref,
 }: {
   appt: AgendaAppointment;
   tz: string;
+  /** Si se pasa, muestra un botón wa.me de recordatorio (QW-5). */
+  reminderHref?: string;
 }) {
   const services = appt.serviceSummary
     .map((s) => (s.quantity > 1 ? `${s.name} ×${s.quantity}` : s.name))
@@ -46,10 +50,8 @@ export function AgendaCard({
       : undefined;
 
   return (
-    <Link
-      href={`/citas/${appt.id}`}
-      className="bg-card block rounded-xl border p-3 transition-shadow hover:shadow-md"
-    >
+    <div className="bg-card overflow-hidden rounded-xl border transition-shadow hover:shadow-md">
+      <Link href={`/citas/${appt.id}`} className="block p-3">
       <div className="flex items-start gap-3">
         {/* Columna de hora */}
         <div className="flex min-w-[46px] flex-col items-center gap-0.5 pt-0.5">
@@ -109,6 +111,18 @@ export function AgendaCard({
           <p className="text-sm font-bold">{formatCOP(appt.totalCop)}</p>
         </div>
       </div>
-    </Link>
+      </Link>
+      {reminderHref ? (
+        <a
+          href={reminderHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-h-11 items-center justify-center gap-2 border-t bg-emerald-50 py-2 text-xs font-semibold text-emerald-700"
+        >
+          <MessageCircle className="size-4" />
+          Enviar recordatorio por WhatsApp
+        </a>
+      ) : null}
+    </div>
   );
 }

@@ -2,6 +2,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  MessageCircle,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -25,6 +26,8 @@ import { ProductList } from "@/modules/inventory/components/product-list";
 import { listProducts } from "@/modules/inventory/repository";
 import { requireTenant } from "@/modules/tenancy/context";
 import { getTenant } from "@/modules/tenancy/repository";
+import { getTemplates } from "@/modules/whatsapp/repository";
+import { buildWaLink, renderTemplate } from "@/modules/whatsapp/templates";
 
 export const metadata: Metadata = { title: "Finanzas" };
 export const dynamic = "force-dynamic";
@@ -96,6 +99,23 @@ export default async function FinanzasPage({
   ]);
 
   const pendingTotal = pending.reduce((s, p) => s + p.saldo, 0n);
+
+  // Cobranza de un toque (QW-6): wa.me por deudora con la plantilla de pago.
+  const templates = await getTemplates(tenantId);
+  const businessName = tenant?.name ?? "";
+  const paymentLinks = new Map(
+    pending.map((p) => [
+      p.appointmentId,
+      buildWaLink(
+        p.clientPhone,
+        renderTemplate(templates.payment_reminder, {
+          clienta: p.clientName,
+          negocio: businessName,
+          saldo: formatCOP(p.saldo),
+        }),
+      ),
+    ]),
+  );
   const deltaPct =
     prevSummary.totalFacturado > 0n
       ? Number(
@@ -292,10 +312,13 @@ export default async function FinanzasPage({
           </div>
           <ul className="divide-y rounded-xl border">
             {pending.map((p) => (
-              <li key={p.appointmentId}>
+              <li
+                key={p.appointmentId}
+                className="hover:bg-accent flex items-center gap-1 pr-2"
+              >
                 <Link
                   href={`/citas/${p.appointmentId}`}
-                  className="hover:bg-accent flex items-center justify-between gap-2 px-3 py-2.5 text-sm"
+                  className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2.5 text-sm"
                 >
                   <span className="min-w-0 flex-1 truncate">
                     {p.clientName}
@@ -306,6 +329,15 @@ export default async function FinanzasPage({
                   </span>
                   <span className="font-medium">{formatCOP(p.saldo)}</span>
                 </Link>
+                <a
+                  href={paymentLinks.get(p.appointmentId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Cobrar a ${p.clientName} por WhatsApp`}
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full text-emerald-600"
+                >
+                  <MessageCircle className="size-5" />
+                </a>
               </li>
             ))}
           </ul>

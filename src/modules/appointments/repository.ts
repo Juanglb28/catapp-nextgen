@@ -188,6 +188,7 @@ export async function listAppointmentsByRange(
  */
 export type AgendaAppointment = Appointment & {
   clientName: string;
+  clientPhone: string;
   serviceSummary: { name: string; quantity: number }[];
 };
 
@@ -201,7 +202,11 @@ export async function listAppointmentsForAgenda(
   end: Date,
 ): Promise<AgendaAppointment[]> {
   const rows = await db
-    .select({ appt: appointments, clientName: clients.name })
+    .select({
+      appt: appointments,
+      clientName: clients.name,
+      clientPhone: clients.phone,
+    })
     .from(appointments)
     .innerJoin(clients, eq(clients.id, appointments.clientId))
     .where(
@@ -237,6 +242,7 @@ export async function listAppointmentsForAgenda(
   return rows.map((r) => ({
     ...r.appt,
     clientName: r.clientName,
+    clientPhone: r.clientPhone,
     serviceSummary: byAppt.get(r.appt.id) ?? [],
   }));
 }
@@ -279,7 +285,11 @@ export async function listAppointmentsByClient(
   const pageSize = Math.min(50, Math.max(1, opts?.pageSize ?? 10));
 
   const rows = await db
-    .select({ appt: appointments, clientName: clients.name })
+    .select({
+      appt: appointments,
+      clientName: clients.name,
+      clientPhone: clients.phone,
+    })
     .from(appointments)
     .innerJoin(clients, eq(clients.id, appointments.clientId))
     .where(
@@ -318,6 +328,7 @@ export async function listAppointmentsByClient(
   const items = pageRows.map((r) => ({
     ...r.appt,
     clientName: r.clientName,
+    clientPhone: r.clientPhone,
     serviceSummary: byAppt.get(r.appt.id) ?? [],
   }));
   return { items, hasMore };
