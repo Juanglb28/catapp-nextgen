@@ -48,7 +48,8 @@ const eslintConfig = [
   // Excepciones: estos archivos sí pueden importar el cliente de DB.
   {
     files: [
-      "src/modules/**/repository.ts",
+      // repository.ts y sus troceos por sub-dominio (repository-public.ts, etc.).
+      "src/modules/**/repository*.ts",
       "src/lib/db.ts",
       "src/lib/auth.ts",
       "drizzle.config.ts",
