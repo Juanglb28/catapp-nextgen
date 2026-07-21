@@ -12,7 +12,7 @@ import {
   sql,
 } from "drizzle-orm";
 
-import { tenantDayRangeUtc, shiftDayKey, tenantDayKey } from "@/lib/dates";
+import { tenantDayRangeUtc } from "@/lib/dates";
 import { db } from "@/lib/db";
 // Solo el schema (tabla) de birthdays, para redimir el bono en la misma
 // transacción que el descuento (B2.2). No importa código de birthdays → sin ciclo.
@@ -1021,11 +1021,9 @@ export async function listScheduledWithoutGcalEvent(
 export async function listTenantsWithAppointmentsTomorrow(): Promise<
   { tenantId: string; timezone: string; count: number; firstStartsAt: Date }[]
 > {
-  const tz = "America/Bogota";
-  const todayKey = tenantDayKey(new Date(), tz);
-  const tomorrowKey = shiftDayKey(todayKey, 1);
-  const { start, end } = tenantDayRangeUtc(tomorrowKey, tz);
-
+  // "Mañana" se evalúa en la TZ de CADA tenant (R-D4), no en una zona fija: la
+  // fecha local de la cita debe ser el día siguiente a hoy en la TZ del negocio.
+  // `x at time zone tz` convierte el timestamptz a la hora local de pared.
   const rows = await db
     .select({
       tenantId: appointments.tenantId,
@@ -1037,9 +1035,8 @@ export async function listTenantsWithAppointmentsTomorrow(): Promise<
     .innerJoin(tenants, eq(appointments.tenantId, tenants.id))
     .where(
       and(
-        gte(appointments.startsAt, start),
-        lt(appointments.startsAt, end),
         eq(appointments.status, "scheduled"),
+        sql`(${appointments.startsAt} at time zone ${tenants.timezone})::date = ((now() at time zone ${tenants.timezone})::date + 1)`,
       ),
     )
     .groupBy(appointments.tenantId, tenants.timezone);

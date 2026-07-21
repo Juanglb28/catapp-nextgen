@@ -2,7 +2,9 @@ import {
   listClientsBirthdayToday,
   upsertBirthdayBonus,
 } from "@/modules/birthdays/repository";
-import { sendBirthdayPushToTenant } from "@/modules/birthdays/push";
+import { birthdayPushPayload } from "@/modules/birthdays/push";
+import { getSubscriptionsByTenant } from "@/modules/push/repository";
+import { sendPushToSubscriptions } from "@/modules/push/send";
 import { constantTimeEqual } from "@/lib/timing-safe";
 
 export const dynamic = "force-dynamic";
@@ -26,16 +28,22 @@ export async function POST(request: Request) {
   let created = 0;
   let notified = 0;
 
-  const year = new Date().getFullYear();
+  // Precarga las suscripciones de todos los tenants con cumpleaños hoy en UNA
+  // query (R-D2), en vez de una por cada notificación.
+  const tenantIds = [...new Set(clients.map((c) => c.tenantId))];
+  const subsByTenant = await getSubscriptionsByTenant(tenantIds);
 
   for (const c of clients) {
-    // Crea el bono si no existe ya este año.
-    const bonus = await upsertBirthdayBonus(c.tenantId, c.clientId, year);
+    // Crea el bono del año en curso EN LA TZ DEL TENANT (R-D4).
+    const bonus = await upsertBirthdayBonus(c.tenantId, c.clientId, c.year);
 
     // Solo notifica si el bono está recién creado (pending_manicurist).
     if (bonus.status === "pending_manicurist") {
       created++;
-      const sent = await sendBirthdayPushToTenant(c.tenantId, c.clientName);
+      const sent = await sendPushToSubscriptions(
+        subsByTenant.get(c.tenantId) ?? [],
+        birthdayPushPayload(c.clientName),
+      );
       if (sent) notified++;
     }
   }

@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 
-import { pushSubscriptions } from "./schema";
+import { type PushSubscription, pushSubscriptions } from "./schema";
 
 /**
  * Repositorio de suscripciones Web Push (B4/R-C3). Movido desde `birthdays` para
@@ -39,6 +39,30 @@ export async function getTenantPushSubscriptions(tenantId: string) {
     .select()
     .from(pushSubscriptions)
     .where(eq(pushSubscriptions.tenantId, tenantId));
+}
+
+/**
+ * Precarga las suscripciones de varios tenants en UNA query, agrupadas por tenant
+ * (B5/R-D2). Evita el N+1 de los crons que envían push a muchos tenants/clientas
+ * (antes: una query de suscripciones por cada envío).
+ */
+export async function getSubscriptionsByTenant(
+  tenantIds: string[],
+): Promise<Map<string, PushSubscription[]>> {
+  const map = new Map<string, PushSubscription[]>();
+  if (tenantIds.length === 0) return map;
+
+  const rows = await db
+    .select()
+    .from(pushSubscriptions)
+    .where(inArray(pushSubscriptions.tenantId, tenantIds));
+
+  for (const row of rows) {
+    const bucket = map.get(row.tenantId);
+    if (bucket) bucket.push(row);
+    else map.set(row.tenantId, [row]);
+  }
+  return map;
 }
 
 /** Elimina una suscripción por id (p. ej. cuando el endpoint ya no existe). */

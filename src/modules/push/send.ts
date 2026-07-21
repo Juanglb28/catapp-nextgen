@@ -1,6 +1,7 @@
 import { isPushConfigured, type PushPayload, sendWebPush } from "@/lib/push";
 
 import { deletePushSubscription, getTenantPushSubscriptions } from "./repository";
+import type { PushSubscription } from "./schema";
 
 /**
  * Envía una notificación push a TODAS las suscripciones del tenant (B4/R-C3).
@@ -16,6 +17,20 @@ export async function sendPushToTenant(
 
   const subs = await getTenantPushSubscriptions(tenantId);
   if (subs.length === 0) return false;
+
+  return sendPushToSubscriptions(subs, payload);
+}
+
+/**
+ * Envía a un conjunto de suscripciones YA cargadas (B5/R-D2), purgando las
+ * muertas (410/404). Para los crons, que precargan las suscripciones de muchos
+ * tenants de una vez y evitan el N+1. Devuelve `true` si se envió al menos una.
+ */
+export async function sendPushToSubscriptions(
+  subs: PushSubscription[],
+  payload: PushPayload,
+): Promise<boolean> {
+  if (!isPushConfigured() || subs.length === 0) return false;
 
   let sent = false;
   for (const sub of subs) {

@@ -1,7 +1,8 @@
 import { formatTime } from "@/lib/dates";
 import { constantTimeEqual } from "@/lib/timing-safe";
 import { listTenantsWithAppointmentsTomorrow } from "@/modules/appointments/repository";
-import { sendPushToTenant } from "@/modules/push/send";
+import { getSubscriptionsByTenant } from "@/modules/push/repository";
+import { sendPushToSubscriptions } from "@/modules/push/send";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,11 @@ export async function POST(request: Request) {
   const tenants = await listTenantsWithAppointmentsTomorrow();
   let notified = 0;
 
+  // Precarga las suscripciones de todos los tenants en UNA query (R-D2).
+  const subsByTenant = await getSubscriptionsByTenant(
+    tenants.map((t) => t.tenantId),
+  );
+
   for (const { tenantId, timezone, count, firstStartsAt } of tenants) {
     const hora = formatTime(firstStartsAt, timezone);
     const body =
@@ -27,7 +33,7 @@ export async function POST(request: Request) {
         ? `Tu primera cita es a las ${hora}.`
         : `Tu primera cita es a las ${hora} y tienes ${count} en total.`;
 
-    const sent = await sendPushToTenant(tenantId, {
+    const sent = await sendPushToSubscriptions(subsByTenant.get(tenantId) ?? [], {
       title:
         count === 1
           ? "📅 Mañana tienes 1 cita"

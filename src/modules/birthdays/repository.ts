@@ -3,6 +3,7 @@ import { and, count, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { tenantDayKey } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { clients } from "@/modules/clients/schema";
+import { tenants } from "@/modules/tenancy/schema";
 
 import {
   type BirthdayBonus,
@@ -300,32 +301,34 @@ export async function pendingBirthdayBonusCount(
  * Usado por el cron de cumpleaños.
  */
 export async function listClientsBirthdayToday(): Promise<
-  { tenantId: string; clientId: string; clientName: string; phone: string }[]
+  {
+    tenantId: string;
+    clientId: string;
+    clientName: string;
+    phone: string;
+    /** Año en curso en la TZ del tenant (para crear el bono del año correcto). */
+    year: number;
+  }[]
 > {
-  // Usamos la hora de Bogotá para el día/mes — el servidor corre en UTC
-  // y a las 9 PM Bogotá ya es otro día en UTC.
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  }).formatToParts(new Date());
-  const month = Number(parts.find((p) => p.type === "month")!.value); // 1-12
-  const day = Number(parts.find((p) => p.type === "day")!.value); // 1-31
-
+  // "Hoy" se evalúa en la TZ de CADA tenant (R-D4), no en una zona fija: `now()`
+  // se convierte a la hora local del negocio y se compara mes/día/año contra el
+  // cumpleaños. A las 9 PM en Bogotá ya es otro día en UTC — y otros husos difieren.
+  const localNow = sql`(now() at time zone ${tenants.timezone})`;
   const rows = await db
     .select({
       tenantId: clients.tenantId,
       clientId: clients.id,
       clientName: clients.name,
       phone: clients.phone,
+      year: sql<number>`cast(extract(year from ${localNow}) as int)`,
     })
     .from(clients)
+    .innerJoin(tenants, eq(tenants.id, clients.tenantId))
     .where(
       and(
         isNull(clients.archivedAt),
-        sql`EXTRACT(MONTH FROM ${clients.birthdayDate}) = ${month}`,
-        sql`EXTRACT(DAY FROM ${clients.birthdayDate}) = ${day}`,
+        sql`extract(month from ${clients.birthdayDate}) = extract(month from ${localNow})`,
+        sql`extract(day from ${clients.birthdayDate}) = extract(day from ${localNow})`,
       ),
     );
 
