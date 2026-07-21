@@ -6,7 +6,7 @@
 |---|-------|----------|-----------------------------------|
 | D-01 | 2026-05 | Stack: Next.js 15 App Router + TS strict + Tailwind v4 + shadcn/ui + Drizzle/Postgres + Serwist + Railway + pnpm | Un solo proyecto full-stack, SQL tipado, deploy simple. Descartado: Supabase (lock-in de auth/API innecesario teniendo Drizzle), stack separado front/back (sobrecosto). |
 | D-02 | 2026-06-10 | **Multi-tenant SaaS** desde Fase 1: varias manicuristas, aislamiento por `tenant_id` en una sola DB | Reemplaza la decisión de mayo 2026 (app de un solo usuario sin login, de una versión anterior de este registro hoy descartada). Aislamiento por columna (no por schema/DB): correcto para miles de tenants pequeños. |
-| D-03 | 2026-06-10 | Auth: Better Auth (email+password y Google OAuth) | Adaptador Drizzle nativo, sesiones en DB. Email verification pospuesta (deuda). |
+| D-03 | 2026-06-10 | Auth: Better Auth (email+password y Google OAuth) | Adaptador Drizzle nativo, sesiones en DB. ~~Email verification pospuesta (deuda).~~ **Actualizado B3.2 (2026-07-20): email verification + linking estricto ACTIVOS cuando `RESEND_API_KEY` está configurada** (forzado en prod; permisivo en dev sin Resend para no bloquear el loop). Cierra RG-5/H-04. |
 | D-04 | 2026-05 | Dinero: `bigint` en pesos COP, sin decimales. Helpers únicos en `lib/money.ts` | Floats prohibidos para dinero. |
 | D-05 | 2026-05 | Fechas: `timestamptz` en DB; TZ del tenant (default America/Bogota) solo al presentar | Las fronteras de día/mes se calculan en la TZ del tenant. |
 | D-06 | 2026-06-10 | WhatsApp en dos etapas: F4 links `wa.me` (manual, gratis) → F8 Cloud API (automático, plantillas Meta) | Valor inmediato sin depender de la aprobación de Meta; la API solo para recordatorios automáticos. Remitente API: número de CatApp (números por tenant = deuda futura). |
@@ -24,7 +24,7 @@
 
 ## Deuda técnica aceptada
 
-- Email verification desactivada (F1).
+- ~~Email verification desactivada (F1).~~ **Resuelto en B3.2 (2026-07-20):** `requireEmailVerification` + account-linking estricto, activos cuando `RESEND_API_KEY` está configurada. Revierte D-03.
 - Número de WhatsApp por tenant (F8 usa número central de CatApp).
 - Cola de mutaciones offline (F9).
-- Rate limiting en memoria por instancia; migrar a Redis si se escala (F10).
+- ~~Rate limiting en memoria por instancia; migrar a Redis si se escala (F10).~~ **Resuelto en B3.3 (2026-07-20):** store durable en Postgres (tabla `rate_limits`, migración 0027), IP del último hop confiable (`TRUSTED_PROXY_HOPS`), cobertura en auth, app-lock (unlock/disable), cita pública y push. Redis solo si el volumen lo exige.

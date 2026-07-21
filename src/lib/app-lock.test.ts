@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   isUnlockValid,
@@ -37,4 +37,16 @@ describe("app-lock cookies firmadas", () => {
     const expired = signPayload({ u: "user1", exp: Date.now() - 1000 });
     expect(isUnlockValid(expired, "user1")).toBe(false);
   });
+
+  it("fail-fast en producción si falta el secreto (RG-4)", () => {
+    // Simula producción sin ningún secreto configurado (los "" son falsy).
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BETTER_AUTH_SECRET", "");
+    vi.stubEnv("APP_LOCK_SECRET", "");
+    expect(() => signPayload({ u: "user1" })).toThrow(/APP_LOCK_SECRET/);
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });

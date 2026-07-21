@@ -24,6 +24,7 @@ import {
 export function RegisterForm() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -45,8 +46,33 @@ export function RegisterForm() {
       );
       return;
     }
-    router.push("/citas");
-    router.refresh();
+    // Con email verification activo, el registro NO crea sesión: la usuaria debe
+    // confirmar su correo primero. Si sí hay sesión (dev sin Resend), entramos.
+    const { data: session } = await authClient.getSession();
+    if (session?.user) {
+      router.push("/citas");
+      router.refresh();
+      return;
+    }
+    setPendingEmail(values.email);
+  }
+
+  if (pendingEmail) {
+    return (
+      <div className="space-y-3 text-center" role="status">
+        <div className="bg-brand/10 text-brand mx-auto flex size-14 items-center justify-center rounded-2xl text-2xl">
+          ✉️
+        </div>
+        <h2 className="text-lg font-semibold">Confirma tu correo</h2>
+        <p className="text-muted-foreground text-sm">
+          Te enviamos un enlace a <strong>{pendingEmail}</strong>. Ábrelo para
+          activar tu cuenta y poder iniciar sesión.
+        </p>
+        <p className="text-muted-foreground text-xs">
+          ¿No llegó? Revisa spam o vuelve a intentarlo en unos minutos.
+        </p>
+      </div>
+    );
   }
 
   return (

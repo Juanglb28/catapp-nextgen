@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { consumeRateLimit } from "@/modules/rate-limit/repository";
 import { requireTenant } from "@/modules/tenancy/context";
 import { savePushSubscription } from "@/modules/birthdays/repository";
 
@@ -16,6 +17,20 @@ const subscriptionSchema = z.object({
 export async function POST(request: Request) {
   try {
     const { tenantId } = await requireTenant();
+
+    // Cobertura de rate-limit (B3.3): 30/min por tenant, generoso para el
+    // re-envío idempotente de la suscripción pero corta abusos.
+    const { allowed, retryAfterSec } = await consumeRateLimit(
+      `push:${tenantId}`,
+      { limit: 30, windowMs: 60_000 },
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "rate_limited" },
+        { status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+      );
+    }
+
     const body = await request.json();
     const parsed = subscriptionSchema.safeParse(body);
     if (!parsed.success) {

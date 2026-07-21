@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { formatDateLong, formatTime } from "@/lib/dates";
 import { formatCOP } from "@/lib/money";
 import { whatsappLink } from "@/lib/phone";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/rate-limit";
 import { buildGoogleCalendarUrl } from "@/modules/appointments/ics";
 import { getPublicAppointment } from "@/modules/appointments/repository";
+import { consumeRateLimit } from "@/modules/rate-limit/repository";
 import { AppointmentConfirmation } from "./appointment-confirmation";
 
 export const metadata: Metadata = {
@@ -43,16 +44,16 @@ export default async function PublicCitaPage({
 }) {
   const { token } = await params;
 
-  // Rate limit: max 30 public-page requests per IP per minute (F10.B1).
-  // Prevents bulk enumeration of the uuid token space.
+  // Rate limit durable: 30 requests por IP por minuto (B3.3). Frena la
+  // enumeración masiva del espacio de tokens uuid.
   const h = await headers();
   const ip = getClientIp(h);
-  const allowed = checkRateLimit(`public-cita:${ip}`, {
-    capacity: 30,
+  const { allowed } = await consumeRateLimit(`public-cita:${ip}`, {
+    limit: 30,
     windowMs: 60_000,
   });
   if (!allowed) {
-    // Return 429 via notFound to avoid leaking the rate-limit as a signal.
+    // 429 vía notFound para no filtrar el rate-limit como señal.
     notFound();
   }
 

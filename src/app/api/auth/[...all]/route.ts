@@ -1,17 +1,18 @@
 import { toNextJsHandler } from "better-auth/next-js";
 
 import { auth } from "@/lib/auth";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/rate-limit";
+import { consumeRateLimit } from "@/modules/rate-limit/repository";
 
 const handler = toNextJsHandler(auth);
 
 export const { GET } = handler;
 
 /**
- * POST handler with rate limiting on sign-in / sign-up paths (F10.B1).
+ * POST handler con rate limiting durable en sign-in / sign-up (B3.3).
  *
- * Limit: 10 attempts per IP per minute. After that, 429 Too Many Requests.
- * All other auth POST paths (sign-out, etc.) are not rate limited.
+ * Límite: 10 intentos por IP por minuto → 429. El resto de rutas de auth
+ * (sign-out, etc.) no se limitan.
  */
 export async function POST(request: Request) {
   const url = new URL(request.url);
@@ -22,8 +23,8 @@ export async function POST(request: Request) {
 
   if (isAuthPath) {
     const ip = getClientIp(request);
-    const allowed = checkRateLimit(`auth:${ip}`, {
-      capacity: 10,
+    const { allowed, retryAfterSec } = await consumeRateLimit(`auth:${ip}`, {
+      limit: 10,
       windowMs: 60_000,
     });
     if (!allowed) {
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
           status: 429,
           headers: {
             "Content-Type": "application/json",
-            "Retry-After": "60",
+            "Retry-After": String(retryAfterSec),
           },
         },
       );

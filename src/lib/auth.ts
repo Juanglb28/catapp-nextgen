@@ -13,6 +13,18 @@ const resend = process.env.RESEND_API_KEY
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
+const fromEmail = process.env.RESEND_FROM_EMAIL ?? "CatApp <no-reply@catapp.co>";
+
+/**
+ * Email verification + account-linking estricto (B3.2, RG-5/H-04). Se activa
+ * cuando Resend está configurado: en producción (con `RESEND_API_KEY`) queda
+ * FORZADO — nadie inicia sesión ni vincula Google sin un email verificado, lo que
+ * cierra la apropiación de cuenta. Si Resend no está (dev sin credenciales) se
+ * desactiva para no bloquear el dev loop ni dejar a las usuarias sin poder
+ * verificar. Revierte D-03 (email verification pasa de deuda a activa).
+ */
+const emailVerificationEnabled = Boolean(resend);
+
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   secret: process.env.BETTER_AUTH_SECRET,
@@ -32,15 +44,15 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
-    // Email verification desactivada por ahora (deuda técnica, ver docs/DECISIONES.md).
-    requireEmailVerification: false,
+    // Verificación de email (B3.2): forzada cuando Resend está configurado.
+    requireEmailVerification: emailVerificationEnabled,
     async sendResetPassword({ user, url }) {
       if (!resend) {
         console.warn("[auth] RESEND_API_KEY no configurada — reset URL:", url);
         return;
       }
       await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "CatApp <no-reply@catapp.co>",
+        from: fromEmail,
         to: user.email,
         subject: "Restablece tu contraseña — CatApp",
         html: `
@@ -52,6 +64,37 @@ export const auth = betterAuth({
             </a>
           </p>
           <p>Este enlace expira en 1 hora. Si no solicitaste esto, ignora este mensaje.</p>
+        `,
+      });
+    },
+  },
+  // Verificación de email (B3.2, RG-5). Se envía al registrarse; al verificar,
+  // la usuaria queda con sesión iniciada. Si Resend no está, se registra la URL
+  // en consola (dev), igual que el reset de contraseña.
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    async sendVerificationEmail({ user, url }) {
+      if (!resend) {
+        console.warn(
+          "[auth] RESEND_API_KEY no configurada — verify URL:",
+          url,
+        );
+        return;
+      }
+      await resend.emails.send({
+        from: fromEmail,
+        to: user.email,
+        subject: "Confirma tu correo — CatApp",
+        html: `
+          <p>¡Hola!</p>
+          <p>Confirma tu correo para empezar a usar CatApp.</p>
+          <p>
+            <a href="${url}" style="background:#06b6d4;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">
+              Confirmar mi correo
+            </a>
+          </p>
+          <p>Si no creaste esta cuenta, ignora este mensaje.</p>
         `,
       });
     },
@@ -73,10 +116,11 @@ export const auth = betterAuth({
     accountLinking: {
       enabled: true,
       trustedProviders: ["google"],
-      // La app no verifica emails (deuda técnica D3), así que los usuarios
-      // existentes tienen emailVerified=false. Sin esto, Better Auth bloquea
-      // el linking y lanza account_not_linked.
-      requireLocalEmailVerified: false,
+      // Linking estricto (B3.2, H-04): solo se vincula Google si el email local
+      // ya está verificado. Evita que alguien reclame una cuenta ajena con un
+      // email no verificado. Atado a la misma condición que la verificación:
+      // permisivo solo cuando no podemos verificar (dev sin Resend).
+      requireLocalEmailVerified: emailVerificationEnabled,
     },
   },
   plugins: [nextCookies()],

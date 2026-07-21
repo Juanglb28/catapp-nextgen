@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { UNLOCK_COOKIE } from "@/lib/app-lock";
+import { consumeRateLimit } from "@/modules/rate-limit/repository";
 import {
   deleteCredentials,
   setLockEnabled,
@@ -16,6 +17,19 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "no_session" }, { status: 401 });
+
+  // Anti-fuerza-bruta (B3.1/RG-3): 5 intentos/min por usuario. Comparte cubeta
+  // con unlock-password para que no se pueda alternar entre ambos endpoints.
+  const { allowed, retryAfterSec } = await consumeRateLimit(
+    `applock:${user.id}`,
+    { limit: 5, windowMs: 60_000 },
+  );
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+    );
+  }
 
   const { password } = (await request.json()) as { password?: unknown };
   if (typeof password !== "string" || password.length === 0) {

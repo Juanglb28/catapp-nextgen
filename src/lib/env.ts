@@ -20,6 +20,10 @@ const envSchema = z.object({
     .min(1, "BETTER_AUTH_SECRET es obligatoria (openssl rand -base64 32)"),
   BETTER_AUTH_URL: z.string().url("BETTER_AUTH_URL debe ser una URL válida"),
 
+  // Opcional: clave dedicada para firmar las cookies de app-lock (B3.1). Si no
+  // se define, se usa BETTER_AUTH_SECRET. Rotarla no invalida las sesiones.
+  APP_LOCK_SECRET: z.string().optional(),
+
   // Opcionales — integraciones que quedan inertes si faltan.
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
@@ -36,6 +40,8 @@ const envSchema = z.object({
   WA_VERIFY_TOKEN: z.string().optional(),
   WA_APP_SECRET: z.string().optional(),
   CRON_SECRET: z.string().optional(),
+  /** Proxies de confianza delante de la app (Railway=1) para resolver la IP real. */
+  TRUSTED_PROXY_HOPS: z.string().optional(),
   SENTRY_DSN: z.string().optional(),
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).optional(),

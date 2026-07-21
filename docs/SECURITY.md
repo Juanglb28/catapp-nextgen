@@ -1,6 +1,6 @@
 # Seguridad — CatApp (F10.B1)
 
-> Auditoría de seguridad completa. Última revisión: 2026-06-17.
+> Auditoría de seguridad completa. Última revisión: 2026-07-20 (B3: seguridad de 2ª capa).
 > Cubre: endpoints, headers, rate limiting, tokens públicos, secretos y OWASP Top 10.
 
 ---
@@ -56,17 +56,20 @@ Patrón obligatorio: **sesión activa → `requireTenant()` → validación Zod 
 
 ---
 
-## 2. Rate Limiting (F10.B1)
+## 2. Rate Limiting (B3.3, antes F10.B1)
 
-Implementación: **token bucket en memoria** (`src/lib/rate-limit.ts`), por proceso Node.js.
+Implementación: **store durable en Postgres** (tabla `rate_limits`, ventana fija atómica vía `INSERT … ON CONFLICT`) en `src/modules/rate-limit/repository.ts` (`consumeRateLimit`). Reemplaza el token-bucket en memoria: sobrevive reinicios/redeploys y es correcto con >1 réplica. Fail-open si la DB no responde (defensa secundaria). La IP se resuelve con el **último hop confiable** de `x-forwarded-for` (`getClientIp`, `TRUSTED_PROXY_HOPS`, default 1), no el primer valor —falsificable— (cierra H-03).
 
-| Endpoint                   | Límite            | Clave              | Razón                       |
-| -------------------------- | ----------------- | ------------------ | --------------------------- |
-| `POST /api/auth/sign-in/*` | 10 req / IP / min | `auth:<ip>`        | Fuerza bruta de contraseñas |
-| `POST /api/auth/sign-up/*` | 10 req / IP / min | `auth:<ip>`        | Spam de cuentas             |
-| `GET /cita/[token]`        | 30 req / IP / min | `public-cita:<ip>` | Enumeración de tokens       |
+| Endpoint                        | Límite            | Clave                | Razón                          |
+| ------------------------------- | ----------------- | -------------------- | ------------------------------ |
+| `POST /api/auth/sign-in/*`      | 10 req / IP / min | `auth:<ip>`          | Fuerza bruta de contraseñas    |
+| `POST /api/auth/sign-up/*`      | 10 req / IP / min | `auth:<ip>`          | Spam de cuentas                |
+| `POST /api/security/unlock-password` | 5 req / usuario / min | `applock:<userId>` | Fuerza bruta de la 2ª capa (RG-3) |
+| `POST /api/security/disable`    | 5 req / usuario / min | `applock:<userId>` | Fuerza bruta de la 2ª capa (RG-3) |
+| `GET /cita/[token]` + acciones  | 30 / 20 req / IP / min | `public-cita:<ip>` / `cita:<ip>` | Enumeración de tokens / spam |
+| `POST /api/push/subscribe`      | 30 req / tenant / min | `push:<tenantId>` | Abuso de suscripciones         |
 
-**Trade-off documentado:** el store es per-instancia; en despliegue multi-instancia migrar a Redis/Upstash (ver `DECISIONES.md`). Railway usa instancia única, así que este límite es efectivo.
+**Multi-instancia:** el store durable ya es correcto con varias réplicas; Redis/Upstash solo si el volumen de escrituras lo exige (ver `DECISIONES.md`).
 
 ---
 
@@ -154,7 +157,14 @@ frame-ancestors 'none'               ← equivalente a X-Frame-Options DENY
 | Item                                                       | Severidad | Plazo            |
 | ---------------------------------------------------------- | --------- | ---------------- |
 | CSP nonce-based (eliminar `'unsafe-inline'` en script-src) | Media     | Post-lanzamiento |
-| Rate limiting con Redis para despliegues multi-instancia   | Baja      | Al escalar       |
+| Rate limiting con Redis (solo si el volumen lo exige; el store durable en Postgres ya cubre multi-instancia) | Baja | Al escalar |
 | Sentry + logging estructurado                              | Media     | F10.B2           |
-| Email verification en registro                             | Baja      | Post-lanzamiento |
+| ~~Email verification en registro~~ **Hecho (B3.2)**: activa con `RESEND_API_KEY`. | — | ✅ |
 | Rotación de `BETTER_AUTH_SECRET` antes del lanzamiento     | Alta      | F10.B3           |
+
+### Resuelto en B3 (2026-07-20)
+
+- **Rate limiting durable + cobertura (B3.3, H-03):** store en Postgres, IP de confianza, cobertura en auth/app-lock/cita/push.
+- **App-lock anti-fuerza-bruta (B3.1, RG-3):** 5 intentos/min en `unlock-password` y `disable`.
+- **Secreto de app-lock fail-fast (B3.1, RG-4):** sin `APP_LOCK_SECRET`/`BETTER_AUTH_SECRET` en producción, no se firman cookies (no forjables).
+- **Email verification + linking estricto (B3.2, RG-5/H-04):** activos con Resend; el registro exige confirmar el correo y el linking de Google solo procede con email verificado.

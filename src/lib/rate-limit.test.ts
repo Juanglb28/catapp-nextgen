@@ -1,82 +1,38 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { checkRateLimit, getClientIp } from "./rate-limit";
+import { getClientIp } from "./rate-limit";
 
 /**
- * Rate limiter token-bucket en memoria (F10.B1) — capa anti-fuerza bruta.
- * El store es un Map a nivel de módulo, así que cada test usa una `key` única
- * para no contaminarse entre sí; el tiempo se controla con fake timers.
+ * `getClientIp` toma la IP del **último hop confiable** de `x-forwarded-for`
+ * (B3.3), no el primer valor (que el cliente puede falsificar). El store durable
+ * del rate-limit se prueba en el test de integración de `modules/rate-limit`.
  */
-describe("checkRateLimit", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-07-20T00:00:00Z"));
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("permite hasta la capacidad y luego bloquea (429)", () => {
-    const key = `login:${Math.random()}`;
-    const cfg = { capacity: 3, windowMs: 60_000 };
-    expect(checkRateLimit(key, cfg)).toBe(true); // 1
-    expect(checkRateLimit(key, cfg)).toBe(true); // 2
-    expect(checkRateLimit(key, cfg)).toBe(true); // 3
-    expect(checkRateLimit(key, cfg)).toBe(false); // agotado
-    expect(checkRateLimit(key, cfg)).toBe(false); // sigue bloqueado
-  });
-
-  it("recarga tras pasar la ventana", () => {
-    const key = `login:${Math.random()}`;
-    const cfg = { capacity: 2, windowMs: 60_000 };
-    expect(checkRateLimit(key, cfg)).toBe(true);
-    expect(checkRateLimit(key, cfg)).toBe(true);
-    expect(checkRateLimit(key, cfg)).toBe(false); // agotado
-
-    vi.advanceTimersByTime(60_000); // una ventana completa
-    expect(checkRateLimit(key, cfg)).toBe(true); // recargado
-  });
-
-  it("no recarga si aún no pasa la ventana completa", () => {
-    const key = `login:${Math.random()}`;
-    const cfg = { capacity: 1, windowMs: 60_000 };
-    expect(checkRateLimit(key, cfg)).toBe(true);
-    expect(checkRateLimit(key, cfg)).toBe(false);
-
-    vi.advanceTimersByTime(59_999); // falta 1 ms
-    expect(checkRateLimit(key, cfg)).toBe(false);
-  });
-
-  it("no acumula por encima de la capacidad tras varias ventanas ociosas", () => {
-    const key = `login:${Math.random()}`;
-    const cfg = { capacity: 2, windowMs: 60_000 };
-    checkRateLimit(key, cfg); // consume 1 (queda 1)
-    vi.advanceTimersByTime(60_000 * 10); // 10 ventanas ociosas
-    // Cap = 2: solo 2 permitidos, no 1 + 10*2.
-    expect(checkRateLimit(key, cfg)).toBe(true);
-    expect(checkRateLimit(key, cfg)).toBe(true);
-    expect(checkRateLimit(key, cfg)).toBe(false);
-  });
-
-  it("claves distintas tienen cubetas independientes", () => {
-    const cfg = { capacity: 1, windowMs: 60_000 };
-    const a = `login:${Math.random()}`;
-    const b = `login:${Math.random()}`;
-    expect(checkRateLimit(a, cfg)).toBe(true);
-    expect(checkRateLimit(a, cfg)).toBe(false); // a agotado
-    expect(checkRateLimit(b, cfg)).toBe(true); // b intacto
-  });
-});
-
 describe("getClientIp", () => {
-  it("toma la primera IP de x-forwarded-for", () => {
-    const headers = new Headers({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" });
-    expect(getClientIp(new Request("https://x", { headers }))).toBe("1.2.3.4");
+  const original = process.env.TRUSTED_PROXY_HOPS;
+  afterEach(() => {
+    if (original === undefined) delete process.env.TRUSTED_PROXY_HOPS;
+    else process.env.TRUSTED_PROXY_HOPS = original;
   });
 
-  it("recorta espacios de la IP", () => {
+  it("toma el último valor de XFF (hop de confianza), ignorando el que finge el cliente", () => {
+    // El cliente falsifica 1.2.3.4; Railway añade la IP real al final.
+    const headers = new Headers({ "x-forwarded-for": "1.2.3.4, 9.9.9.9" });
+    expect(getClientIp(new Request("https://x", { headers }))).toBe("9.9.9.9");
+  });
+
+  it("con una sola IP la devuelve tal cual (recortando espacios)", () => {
     const headers = new Headers({ "x-forwarded-for": "  5.6.7.8  " });
     expect(getClientIp(new Request("https://x", { headers }))).toBe("5.6.7.8");
+  });
+
+  it("respeta TRUSTED_PROXY_HOPS>1 (varios proxies de confianza)", () => {
+    process.env.TRUSTED_PROXY_HOPS = "2";
+    // cliente, proxyA, proxyB → con 2 hops de confianza la IP del cliente es la
+    // penúltima ("real") y la última es de infraestructura.
+    const headers = new Headers({
+      "x-forwarded-for": "spoof, real, infra",
+    });
+    expect(getClientIp(new Request("https://x", { headers }))).toBe("real");
   });
 
   it("devuelve 'unknown' si falta el header", () => {
@@ -84,7 +40,9 @@ describe("getClientIp", () => {
   });
 
   it("acepta un objeto tipo ReadonlyHeaders (Server Actions)", () => {
-    const like = { get: (n: string) => (n === "x-forwarded-for" ? "9.9.9.9" : null) };
+    const like = {
+      get: (n: string) => (n === "x-forwarded-for" ? "9.9.9.9" : null),
+    };
     expect(getClientIp(like)).toBe("9.9.9.9");
   });
 });

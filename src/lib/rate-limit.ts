@@ -1,67 +1,8 @@
 /**
- * Token-bucket rate limiter — in-memory, per process instance (F10.B1).
- *
- * Trade-offs (documented in DECISIONES.md):
- *  - Works correctly on Railway's single Node.js process.
- *  - On multi-instance deployments each instance has an independent bucket;
- *    an attacker can spread requests across instances. Migrate the store to
- *    Redis/Upstash when horizontal scaling is needed.
- *  - The store is a module-level Map, so it persists for the lifetime of the
- *    process (no TTL cleanup). Memory impact is negligible at this scale
- *    (one entry ≈ 60 bytes; 10 000 unique IPs ≈ 600 KB).
+ * Utilidades de rate limiting (B3.3, R-B7). El *store* durable vive en
+ * `@/modules/rate-limit/repository` (`consumeRateLimit`) — aquí solo queda la
+ * extracción de la IP del cliente, que es lógica pura sin acceso a datos.
  */
-
-interface Bucket {
-  tokens: number;
-  lastRefill: number;
-}
-
-// Module-level store: survives across requests within the same Node.js process.
-const store = new Map<string, Bucket>();
-
-export interface RateLimitConfig {
-  /** Maximum number of tokens (burst capacity). Default: 10. */
-  capacity?: number;
-  /** Tokens restored per window. Default: equals capacity. */
-  refillAmount?: number;
-  /** Refill window in milliseconds. Default: 60_000 (1 min). */
-  windowMs?: number;
-}
-
-/**
- * Checks whether `key` is allowed to proceed.
- *
- * Returns `true` (allowed) or `false` (rate limited / 429).
- *
- * @param key   Unique key, e.g. `"login:1.2.3.4"` or `"public-cita:1.2.3.4"`.
- */
-export function checkRateLimit(
-  key: string,
-  { capacity = 10, refillAmount, windowMs = 60_000 }: RateLimitConfig = {},
-): boolean {
-  const fill = refillAmount ?? capacity;
-  const now = Date.now();
-  const bucket = store.get(key);
-
-  if (!bucket) {
-    // First request from this key: grant immediately, start with capacity - 1.
-    store.set(key, { tokens: capacity - 1, lastRefill: now });
-    return true;
-  }
-
-  // Refill: restore `fill` tokens per elapsed window.
-  const windowsElapsed = Math.floor((now - bucket.lastRefill) / windowMs);
-  const restored = Math.min(capacity, bucket.tokens + windowsElapsed * fill);
-  const lastRefill = windowsElapsed > 0 ? now : bucket.lastRefill;
-
-  if (restored <= 0) {
-    store.set(key, { tokens: restored, lastRefill });
-    return false; // rate limited
-  }
-
-  store.set(key, { tokens: restored - 1, lastRefill });
-  return true; // allowed
-}
 
 /** Minimal interface satisfied by both `Request.headers` and Next.js `ReadonlyHeaders`. */
 interface HeadersLike {
@@ -69,14 +10,33 @@ interface HeadersLike {
 }
 
 /**
- * Extract the client IP address.
+ * Extrae la IP del cliente desde `x-forwarded-for` usando el **último hop
+ * confiable** (B3.3, antes se tomaba el primer valor, que el cliente puede
+ * falsificar). El proxy de Railway antepone la cadena XFF y añade la IP real de
+ * quien se conecta a él como el valor MÁS A LA DERECHA; un `X-Forwarded-For`
+ * enviado por el atacante queda a la izquierda y se ignora.
  *
- * Accepts either a `Request` object (route handlers) or the `ReadonlyHeaders`
- * returned by `next/headers` (Server Components / Server Actions).
- * Railway sets `x-forwarded-for` with the real client IP.
+ * `TRUSTED_PROXY_HOPS` (default 1) = número de proxies de confianza delante de la
+ * app; la IP del cliente está a esa distancia del final de la lista.
+ *
+ * Acepta un `Request` (route handlers) o los `ReadonlyHeaders` de `next/headers`
+ * (Server Components / Server Actions).
  */
 export function getClientIp(source: Request | HeadersLike): string {
   const hdrs =
     source instanceof Request ? source.headers : (source as HeadersLike);
-  return hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const xff = hdrs.get("x-forwarded-for");
+  if (!xff) return "unknown";
+
+  const parts = xff
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return "unknown";
+
+  const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS ?? "1"));
+  // Con `hops` proxies de confianza, la IP del cliente está a `hops` posiciones
+  // desde el final. Si la lista es más corta que `hops`, caemos al primer valor.
+  const idx = parts.length - hops;
+  return parts[idx] ?? parts[0];
 }

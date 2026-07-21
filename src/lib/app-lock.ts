@@ -6,7 +6,25 @@ import { createHmac, timingSafeEqual } from "crypto";
  * `UNLOCK_TTL_MS` desde que se concede (por sesión/tiempo).
  */
 
-const SECRET = process.env.BETTER_AUTH_SECRET ?? "dev-insecure-app-lock-secret";
+/**
+ * Secreto para firmar las cookies de app-lock (RG-4). Fail-fast en producción si
+ * falta: sin un secreto real, un atacante podría FORJAR la cookie de desbloqueo
+ * y saltarse la segunda capa. Se prefiere `APP_LOCK_SECRET` (clave dedicada,
+ * opcional) y si no `BETTER_AUTH_SECRET`. En desarrollo se permite un valor
+ * inseguro para no bloquear el dev loop. Se resuelve de forma perezosa (no a
+ * nivel de módulo) para no romper el build cuando el secreto no está presente.
+ */
+function getSecret(): string {
+  const secret =
+    process.env.APP_LOCK_SECRET ?? process.env.BETTER_AUTH_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Falta APP_LOCK_SECRET/BETTER_AUTH_SECRET: no se pueden firmar las cookies de app-lock (RG-4).",
+    );
+  }
+  return "dev-insecure-app-lock-secret";
+}
 
 export const UNLOCK_COOKIE = "catapp_unlock";
 export const CHALLENGE_COOKIE = "catapp_wachal";
@@ -24,7 +42,7 @@ export function rpConfig(): { rpName: string; rpID: string; origin: string } {
 }
 
 function hmac(data: string): Buffer {
-  return createHmac("sha256", SECRET).update(data).digest();
+  return createHmac("sha256", getSecret()).update(data).digest();
 }
 
 /** Firma un objeto como `<b64url(json)>.<b64url(sig)>`. */

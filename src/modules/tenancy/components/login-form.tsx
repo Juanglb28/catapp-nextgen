@@ -26,6 +26,8 @@ import {
 export function LoginForm({ resetOk = false }: { resetOk?: boolean }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -34,16 +36,28 @@ export function LoginForm({ resetOk = false }: { resetOk?: boolean }) {
 
   async function onSubmit(values: LoginInput) {
     setServerError(null);
+    setUnverifiedEmail(null);
     const { error } = await authClient.signIn.email({
       email: values.email,
       password: values.password,
     });
     if (error) {
+      // Better Auth devuelve 403/EMAIL_NOT_VERIFIED si el correo no está confirmado.
+      if (error.status === 403 || error.code === "EMAIL_NOT_VERIFIED") {
+        setUnverifiedEmail(values.email);
+        return;
+      }
       setServerError("Correo o contraseña incorrectos.");
       return;
     }
     router.push("/citas");
     router.refresh();
+  }
+
+  async function resendVerification() {
+    if (!unverifiedEmail) return;
+    await authClient.sendVerificationEmail({ email: unverifiedEmail });
+    setResent(true);
   }
 
   return (
@@ -102,6 +116,28 @@ export function LoginForm({ resetOk = false }: { resetOk?: boolean }) {
             </FormItem>
           )}
         />
+        {unverifiedEmail ? (
+          <div
+            className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+            role="alert"
+          >
+            <p>
+              Debes confirmar tu correo antes de entrar. Revisa la bandeja de{" "}
+              <strong>{unverifiedEmail}</strong>.
+            </p>
+            {resent ? (
+              <p className="mt-1 text-amber-700">Te reenviamos el enlace.</p>
+            ) : (
+              <button
+                type="button"
+                onClick={resendVerification}
+                className="mt-1 font-medium underline"
+              >
+                Reenviar correo de confirmación
+              </button>
+            )}
+          </div>
+        ) : null}
         {serverError ? (
           <p className="text-destructive text-sm" role="alert">
             {serverError}
