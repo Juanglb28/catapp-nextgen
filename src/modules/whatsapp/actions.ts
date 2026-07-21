@@ -2,12 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { ActionResult } from "@/lib/action-result";
 import { requireTenant } from "@/modules/tenancy/context";
 
 import { upsertTemplate } from "./repository";
 import { saveTemplateSchema } from "./validation";
-
-export type ActionResult = { ok: true } | { ok: false; error: string };
 
 export async function saveMessageTemplateAction(
   input: unknown,

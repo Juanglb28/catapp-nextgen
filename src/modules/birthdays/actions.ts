@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import type { ActionResult } from "@/lib/action-result";
 import { requireTenant } from "@/modules/tenancy/context";
 import { getTenant } from "@/modules/tenancy/repository";
 
@@ -15,10 +16,6 @@ import {
   listBonusOptions,
   updateBonusOption,
 } from "./repository";
-
-export type ActionResult<T = undefined> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
 
 /** Manicurista aprueba el bono → status 'approved'. */
 export async function approveBonusAction(

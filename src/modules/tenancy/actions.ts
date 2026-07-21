@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import type { ActionResult } from "@/lib/action-result";
 import { normalizePhoneCO } from "@/lib/phone";
 import { swallow } from "@/lib/swallow";
 import { auth } from "@/lib/auth";
@@ -17,8 +18,6 @@ import {
 } from "@/modules/tenancy/repository";
 import { createServices } from "@/modules/services/repository";
 import { SAMPLE_SERVICES } from "@/modules/services/validation";
-
-export type ActionResult = { ok: true } | { ok: false; error: string };
 
 const publicInfoSchema = z.object({
   publicAddress: z

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import type { ActionResult } from "@/lib/action-result";
 import { normalizePhoneCO } from "@/lib/phone";
 import { swallow } from "@/lib/swallow";
 import {
@@ -49,10 +50,6 @@ export type ContactImportInput = {
   /** Fecha de cumpleaños "YYYY-MM-DD" extraída de Google Contacts (opcional). */
   birthdayDate?: string;
 };
-
-export type ActionResult<T = undefined> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
 
 /** Normaliza el formulario validado a la forma que persiste el repositorio. */
 function toClientInput(data: {

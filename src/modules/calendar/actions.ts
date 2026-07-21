@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import type { ActionResult } from "@/lib/action-result";
 import { listScheduledWithoutGcalEvent } from "@/modules/appointments/repository";
 import { requireTenant } from "@/modules/tenancy/context";
 
@@ -13,8 +14,6 @@ import {
   updateCalendarSettings,
 } from "./repository";
 import { syncAppointment } from "./sync";
-
-export type ActionResult = { ok: true } | { ok: false; error: string };
 
 const settingsSchema = z.object({
   calendarId: z.string().min(1).max(200).optional(),

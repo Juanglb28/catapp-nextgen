@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
+import type { ActionResult } from "@/lib/action-result";
 import { formatTime, tenantDayKey, tenantLocalToUtc } from "@/lib/dates";
 import { formatCOP } from "@/lib/money";
 import { syncAppointment } from "@/modules/calendar/sync";
@@ -157,7 +158,6 @@ export async function createAppointmentAction(
   return { ok: true, id: appointment.id };
 }
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
 
 function revalidateAppointment(id: string) {
   revalidatePath("/citas");

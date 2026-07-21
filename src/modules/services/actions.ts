@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireTenant } from "@/modules/tenancy/context";
+import { type ActionResult, fail, ok } from "@/lib/action-result";
+import { withTenantAction } from "@/modules/tenancy/action";
 
 import {
   activateService,
@@ -12,10 +13,6 @@ import {
   updateService,
 } from "./repository";
 import { serviceFormSchema } from "./validation";
-
-export type ActionResult<T = undefined> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
 
 const SERVICES_PATH = "/ajustes/servicios";
 
@@ -46,52 +43,54 @@ function toServiceInput(data: {
 export async function createServiceAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
-  const { tenantId } = await requireTenant();
-  const parsed = parse(input);
-  if (!parsed.ok) return parsed;
+  return withTenantAction(async ({ tenantId }) => {
+    const parsed = parse(input);
+    if (!parsed.ok) return fail(parsed.error);
 
-  const service = await createService(tenantId, toServiceInput(parsed.data));
-  revalidatePath(SERVICES_PATH);
-  return { ok: true, data: { id: service.id } };
+    const service = await createService(tenantId, toServiceInput(parsed.data));
+    revalidatePath(SERVICES_PATH);
+    return ok({ id: service.id });
+  });
 }
 
 export async function updateServiceAction(
   id: string,
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
-  const { tenantId } = await requireTenant();
-  const parsed = parse(input);
-  if (!parsed.ok) return parsed;
+  return withTenantAction(async ({ tenantId }) => {
+    const parsed = parse(input);
+    if (!parsed.ok) return fail(parsed.error);
 
-  const service = await updateService(
-    tenantId,
-    id,
-    toServiceInput(parsed.data),
-  );
-  if (!service) return { ok: false, error: "No se encontró el servicio." };
+    const service = await updateService(
+      tenantId,
+      id,
+      toServiceInput(parsed.data),
+    );
+    if (!service) return fail("No se encontró el servicio.");
 
-  revalidatePath(SERVICES_PATH);
-  return { ok: true, data: { id: service.id } };
+    revalidatePath(SERVICES_PATH);
+    return ok({ id: service.id });
+  });
 }
 
 export async function deactivateServiceAction(
   id: string,
-): Promise<ActionResult<undefined>> {
-  const { tenantId } = await requireTenant();
-  const service = await deactivateService(tenantId, id);
-  if (!service) return { ok: false, error: "No se encontró el servicio." };
+): Promise<ActionResult> {
+  return withTenantAction(async ({ tenantId }) => {
+    const service = await deactivateService(tenantId, id);
+    if (!service) return fail("No se encontró el servicio.");
 
-  revalidatePath(SERVICES_PATH);
-  return { ok: true, data: undefined };
+    revalidatePath(SERVICES_PATH);
+    return ok();
+  });
 }
 
-export async function activateServiceAction(
-  id: string,
-): Promise<ActionResult<undefined>> {
-  const { tenantId } = await requireTenant();
-  const service = await activateService(tenantId, id);
-  if (!service) return { ok: false, error: "No se encontró el servicio." };
+export async function activateServiceAction(id: string): Promise<ActionResult> {
+  return withTenantAction(async ({ tenantId }) => {
+    const service = await activateService(tenantId, id);
+    if (!service) return fail("No se encontró el servicio.");
 
-  revalidatePath(SERVICES_PATH);
-  return { ok: true, data: undefined };
+    revalidatePath(SERVICES_PATH);
+    return ok();
+  });
 }
