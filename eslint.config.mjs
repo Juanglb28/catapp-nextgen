@@ -56,6 +56,15 @@ const eslintConfig = [
     ],
     rules: { "no-restricted-imports": "off" },
   },
+  // Guardrail anti-ciclos (B4/R-D3). No hay ciclos de imports hoy (verificado);
+  // esta regla los previene en el futuro. Usa el plugin `import` y el resolver
+  // TypeScript que ya trae `eslint-config-next` (fijados en devDependencies).
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "import/no-cycle": ["error", { maxDepth: 12, ignoreExternal: true }],
+    },
+  },
   // Must be last: disables ESLint rules that conflict with Prettier.
   eslintConfigPrettier,
 ];
