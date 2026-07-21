@@ -27,4 +27,5 @@
 - ~~Email verification desactivada (F1).~~ **Resuelto en B3.2 (2026-07-20):** `requireEmailVerification` + account-linking estricto, activos cuando `RESEND_API_KEY` está configurada. Revierte D-03.
 - Número de WhatsApp por tenant (F8 usa número central de CatApp).
 - Cola de mutaciones offline (F9).
+- **RLS (Row Level Security) en Postgres — DIFERIDO (P1, R-B6, 2026-07-21):** defensa en profundidad multi-tenant. Riesgo alto (cambia el patrón de acceso a datos; puede romper queries legítimas o el aislamiento); requiere `withTenantDb` + rollout gradual por tabla con los tests de aislamiento A/B como red. El aislamiento actual por `tenant_id` en cada query (D-11 + regla ESLint) se mantiene como control primario. Hacerlo en sesión dedicada.
 - ~~Rate limiting en memoria por instancia; migrar a Redis si se escala (F10).~~ **Resuelto en B3.3 (2026-07-20):** store durable en Postgres (tabla `rate_limits`, migración 0027), IP del último hop confiable (`TRUSTED_PROXY_HOPS`), cobertura en auth, app-lock (unlock/disable), cita pública y push. Redis solo si el volumen lo exige.
