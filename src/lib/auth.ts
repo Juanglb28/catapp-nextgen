@@ -68,37 +68,42 @@ export const auth = betterAuth({
       });
     },
   },
-  // Verificación de email (B3.2, RG-5). Se envía al registrarse; al verificar,
-  // la usuaria queda con sesión iniciada. Si Resend no está, se registra la URL
-  // en consola (dev), igual que el reset de contraseña.
-  emailVerification: {
-    sendOnSignUp: true,
-    autoSignInAfterVerification: true,
-    async sendVerificationEmail({ user, url }) {
-      if (!resend) {
-        console.warn(
-          "[auth] RESEND_API_KEY no configurada — verify URL:",
-          url,
-        );
-        return;
+  // Verificación de email (B3.2, RG-5). SOLO se configura cuando Resend está
+  // disponible: `sendOnSignUp` es independiente de `requireEmailVerification`, y
+  // dejarlo activo sin Resend haría que Better Auth cree un token de verificación
+  // en cada registro (rompe el alta sin poder enviar el correo). Al verificar, la
+  // usuaria queda con sesión iniciada.
+  ...(emailVerificationEnabled && resend
+    ? {
+        emailVerification: {
+          sendOnSignUp: true,
+          autoSignInAfterVerification: true,
+          async sendVerificationEmail({
+            user,
+            url,
+          }: {
+            user: { email: string };
+            url: string;
+          }) {
+            await resend.emails.send({
+              from: fromEmail,
+              to: user.email,
+              subject: "Confirma tu correo — CatApp",
+              html: `
+                <p>¡Hola!</p>
+                <p>Confirma tu correo para empezar a usar CatApp.</p>
+                <p>
+                  <a href="${url}" style="background:#06b6d4;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">
+                    Confirmar mi correo
+                  </a>
+                </p>
+                <p>Si no creaste esta cuenta, ignora este mensaje.</p>
+              `,
+            });
+          },
+        },
       }
-      await resend.emails.send({
-        from: fromEmail,
-        to: user.email,
-        subject: "Confirma tu correo — CatApp",
-        html: `
-          <p>¡Hola!</p>
-          <p>Confirma tu correo para empezar a usar CatApp.</p>
-          <p>
-            <a href="${url}" style="background:#06b6d4;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">
-              Confirmar mi correo
-            </a>
-          </p>
-          <p>Si no creaste esta cuenta, ignora este mensaje.</p>
-        `,
-      });
-    },
-  },
+    : {}),
   // Google OAuth solo si hay credenciales (mismo proyecto se reutiliza en F5 para Calendar).
   ...(googleClientId && googleClientSecret
     ? {
