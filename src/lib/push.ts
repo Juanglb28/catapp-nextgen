@@ -1,20 +1,15 @@
 /**
- * Envío genérico de Web Push Notifications (VAPID).
+ * Primitiva de envío Web Push (VAPID). Capa de bajo nivel, SIN dependencias de
+ * módulos (B4/R-C3): recibe una suscripción concreta y envía. La orquestación
+ * por tenant (buscar suscripciones, purgar las muertas) vive en el módulo push
+ * (`@/modules/push/send`), que sí puede tocar el repositorio.
  *
- * Variables de entorno requeridas:
- *   VAPID_PUBLIC_KEY  — clave pública VAPID (base64url)
- *   VAPID_PRIVATE_KEY — clave privada VAPID (base64url)
- *   VAPID_SUBJECT     — mailto o URL del remitente (p.ej. mailto:admin@catapp.app)
- *
- * Para generar las claves: npx web-push generate-vapid-keys
+ * Variables de entorno: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
+ * Genera las claves con: npx web-push generate-vapid-keys
  */
 import webPush from "web-push";
 
 import { getVapidConfig, isPushConfigured } from "@/lib/env";
-import {
-  deletePushSubscription,
-  getTenantPushSubscriptions,
-} from "@/modules/birthdays/repository";
 
 export { isPushConfigured };
 
@@ -24,47 +19,48 @@ export interface PushPayload {
   url?: string;
 }
 
-function setupVapid() {
+/** Datos mínimos de una suscripción para enviar (sin acoplar al schema). */
+export interface WebPushTarget {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+/** Resultado de un envío individual. */
+export interface WebPushResult {
+  /** El envío fue aceptado. */
+  ok: boolean;
+  /** El endpoint ya no existe (410 Gone / 404): el llamador debe borrar la sub. */
+  gone: boolean;
+}
+
+function setupVapid(): void {
   const vapid = getVapidConfig();
   if (!vapid) return;
   webPush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
 }
 
 /**
- * Envía una push notification a todas las suscripciones del tenant.
- * Devuelve `true` si se envió al menos una.
- * No hace nada si las variables VAPID no están configuradas.
+ * Envía una notificación a UNA suscripción. No lanza: traduce el error a
+ * `{ ok, gone }` para que el llamador decida (purgar la sub si `gone`).
  */
-export async function sendPushToTenant(
-  tenantId: string,
+export async function sendWebPush(
+  target: WebPushTarget,
   payload: PushPayload,
-): Promise<boolean> {
-  if (!isPushConfigured()) return false;
+): Promise<WebPushResult> {
+  if (!isPushConfigured()) return { ok: false, gone: false };
   setupVapid();
-
-  const subs = await getTenantPushSubscriptions(tenantId);
-  if (subs.length === 0) return false;
-
-  const data = JSON.stringify(payload);
-  let sent = false;
-
-  for (const sub of subs) {
-    try {
-      await webPush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth },
-        },
-        data,
-      );
-      sent = true;
-    } catch (err) {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 410 || status === 404) {
-        await deletePushSubscription(sub.id);
-      }
-    }
+  try {
+    await webPush.sendNotification(
+      {
+        endpoint: target.endpoint,
+        keys: { p256dh: target.p256dh, auth: target.auth },
+      },
+      JSON.stringify(payload),
+    );
+    return { ok: true, gone: false };
+  } catch (err) {
+    const status = (err as { statusCode?: number }).statusCode;
+    return { ok: false, gone: status === 410 || status === 404 };
   }
-
-  return sent;
 }

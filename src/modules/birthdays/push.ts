@@ -2,7 +2,7 @@
  * Push notifications para alertas de cumpleaños.
  * La logica generica de envio vive en @/lib/push.
  */
-import { sendPushToTenant } from "@/lib/push";
+import { sendPushToTenant } from "@/modules/push/send";
 
 /**
  * Envia una push notification de cumpleanos a todas las suscripciones del tenant.

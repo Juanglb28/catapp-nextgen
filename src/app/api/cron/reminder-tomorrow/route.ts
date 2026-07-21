@@ -1,7 +1,7 @@
 import { formatTime } from "@/lib/dates";
-import { sendPushToTenant } from "@/lib/push";
 import { constantTimeEqual } from "@/lib/timing-safe";
 import { listTenantsWithAppointmentsTomorrow } from "@/modules/appointments/repository";
+import { sendPushToTenant } from "@/modules/push/send";
 
 export const dynamic = "force-dynamic";
 

@@ -9,7 +9,6 @@ import {
   type BonusOption,
   birthdayBonuses,
   bonusOptions,
-  pushSubscriptions,
 } from "./schema";
 
 // ─── Opciones de bono por tenant (D-19, B1.1) ────────────────────────────────
@@ -333,43 +332,5 @@ export async function listClientsBirthdayToday(): Promise<
   return rows;
 }
 
-// ─── Push subscriptions ──────────────────────────────────────────────────────
-
-/**
- * Almacena (o actualiza) una suscripción Web Push para el tenant.
- * Se llama desde el endpoint /api/push/subscribe.
- */
-export async function savePushSubscription(
-  tenantId: string,
-  sub: { endpoint: string; keys: { p256dh: string; auth: string } },
-): Promise<void> {
-  await db
-    .insert(pushSubscriptions)
-    .values({
-      tenantId,
-      endpoint: sub.endpoint,
-      p256dh: sub.keys.p256dh,
-      auth: sub.keys.auth,
-    })
-    .onConflictDoUpdate({
-      target: pushSubscriptions.endpoint,
-      set: {
-        tenantId,
-        p256dh: sub.keys.p256dh,
-        auth: sub.keys.auth,
-      },
-    });
-}
-
-/** Devuelve todas las suscripciones push del tenant. */
-export async function getTenantPushSubscriptions(tenantId: string) {
-  return db
-    .select()
-    .from(pushSubscriptions)
-    .where(eq(pushSubscriptions.tenantId, tenantId));
-}
-
-/** Elimina una suscripción push por su id (p.ej. cuando el endpoint ya no existe). */
-export async function deletePushSubscription(id: string): Promise<void> {
-  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, id));
-}
+// Las funciones de suscripciones push se movieron a `@/modules/push/repository`
+// (B4/R-C3): el push no es un concern de cumpleaños.

@@ -12,9 +12,10 @@ const { sendPushToTenant } = vi.hoisted(() => ({
     ),
 }));
 
-vi.mock("@/lib/push", () => ({
+// `sendClientDecisionPush`/`sendBirthdayPushToTenant` importan `sendPushToTenant`
+// desde el módulo push (B4/R-C3), así que el mock apunta ahí.
+vi.mock("@/modules/push/send", () => ({
   sendPushToTenant,
-  isPushConfigured: () => true,
 }));
 
 import { sendClientDecisionPush } from "@/modules/appointments/push";

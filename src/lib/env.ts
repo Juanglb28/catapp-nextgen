@@ -45,6 +45,31 @@ const envSchema = z.object({
   SENTRY_DSN: z.string().optional(),
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).optional(),
+}).superRefine((env, ctx) => {
+  // VAPID es todo-o-nada (B4/R-C3): una configuración parcial rompía el push en
+  // silencio (bug "0 suscripciones" de 2026-07). Si hay alguna, deben estar las 3.
+  const serverVapid = [
+    env.VAPID_PUBLIC_KEY,
+    env.VAPID_PRIVATE_KEY,
+    env.VAPID_SUBJECT,
+  ];
+  const set = serverVapid.filter(Boolean).length;
+  if (set > 0 && set < 3) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["VAPID"],
+      message:
+        "Configuración VAPID incompleta: define VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY y VAPID_SUBJECT (las 3) o ninguna.",
+    });
+  }
+  if (set === 3 && !env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["NEXT_PUBLIC_VAPID_PUBLIC_KEY"],
+      message:
+        "Falta NEXT_PUBLIC_VAPID_PUBLIC_KEY: el cliente la necesita para suscribirse al push.",
+    });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { savePushSubscription } from "@/modules/push/repository";
 import { consumeRateLimit } from "@/modules/rate-limit/repository";
 import { requireTenant } from "@/modules/tenancy/context";
-import { savePushSubscription } from "@/modules/birthdays/repository";
 
 const subscriptionSchema = z.object({
   endpoint: z.string().url(),

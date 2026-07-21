@@ -2,7 +2,7 @@
  * Push notifications relacionadas con citas (para la manicurista).
  * La lógica genérica de envío VAPID vive en @/lib/push.
  */
-import { sendPushToTenant } from "@/lib/push";
+import { sendPushToTenant } from "@/modules/push/send";
 
 export type ClientDecision = "accepted" | "rejected";
 

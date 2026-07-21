@@ -1,7 +1,8 @@
 "use server";
 
-import { isPushConfigured, sendPushToTenant } from "@/lib/push";
-import { getTenantPushSubscriptions } from "@/modules/birthdays/repository";
+import { isPushConfigured } from "@/lib/push";
+import { getTenantPushSubscriptions } from "@/modules/push/repository";
+import { sendPushToTenant } from "@/modules/push/send";
 import { requireTenant } from "@/modules/tenancy/context";
 
 /**

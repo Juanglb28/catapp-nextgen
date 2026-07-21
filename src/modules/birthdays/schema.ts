@@ -96,22 +96,5 @@ export const birthdayBonuses = pgTable(
 
 export type BirthdayBonus = typeof birthdayBonuses.$inferSelect;
 
-/** Suscripciones Web Push por tenant. */
-export const pushSubscriptions = pgTable(
-  "push_subscriptions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    tenantId: uuid("tenant_id")
-      .notNull()
-      .references(() => tenants.id, { onDelete: "cascade" }),
-    endpoint: text("endpoint").notNull().unique(),
-    p256dh: text("p256dh").notNull(),
-    auth: text("auth").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (t) => [index("push_subscriptions_tenant_idx").on(t.tenantId)],
-);
-
-export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+// `push_subscriptions` se movió al módulo push (B4/R-C3): ver
+// `@/modules/push/schema`. La tabla es la misma; solo cambió de archivo.
