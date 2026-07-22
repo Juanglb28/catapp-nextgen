@@ -5,6 +5,11 @@
 
 :root {
   --radius: 0.625rem;
+  /* Marca por defecto (paleta "Clásico" — cian). */
+  --brand: #0891b2;
+  --brand-foreground: #ffffff;
+  --brand-from: #10b981;
+  --brand-to: #0ea5e9;
   --background: oklch(0.987 0.012 200);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -72,6 +77,269 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ─── Paletas (B6) ────────────────────────────────────────────────────────────
+   Re-skin completo por paleta (fondos + superficies + acento) en light y dark.
+   `data-palette` va en <html> (junto a la clase `.dark`). El bloque light usa
+   `[data-palette="X"]` y el dark `.dark[data-palette="X"]` (mayor especificidad,
+   gana en modo oscuro). La paleta "Clásico" (cian) es :root/.dark, sin bloque.
+   Colores base tomados del PDF de referencia (Cat-App-Next-Colors). */
+
+/* Esmeralda — verde esmeralda #05AD98 */
+[data-palette="esmeralda"] {
+  --background: #f3f8f7;
+  --foreground: #142320;
+  --card: #ffffff;
+  --card-foreground: #142320;
+  --popover: #ffffff;
+  --popover-foreground: #142320;
+  --primary: #05ad98;
+  --primary-foreground: #ffffff;
+  --secondary: #e6efec;
+  --secondary-foreground: #142320;
+  --muted: #eef4f2;
+  --muted-foreground: #566b66;
+  --accent: #d8ece7;
+  --accent-foreground: #0a3f38;
+  --border: #d6e3df;
+  --input: #d6e3df;
+  --ring: #05ad98;
+  --brand: #05ad98;
+  --brand-foreground: #ffffff;
+  --brand-from: #10b981;
+  --brand-to: #05ad98;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #142320;
+  --sidebar-primary: #05ad98;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d8ece7;
+  --sidebar-accent-foreground: #0a3f38;
+  --sidebar-border: #d6e3df;
+  --sidebar-ring: #05ad98;
+}
+.dark[data-palette="esmeralda"] {
+  --background: #0d1a18;
+  --foreground: #eaf3f1;
+  --card: #14211f;
+  --card-foreground: #eaf3f1;
+  --popover: #14211f;
+  --popover-foreground: #eaf3f1;
+  --primary: #0cc4ac;
+  --primary-foreground: #04231f;
+  --secondary: #1e302d;
+  --secondary-foreground: #eaf3f1;
+  --muted: #1e302d;
+  --muted-foreground: #9fb3af;
+  --accent: #274039;
+  --accent-foreground: #eaf3f1;
+  --border: #2a3d3a;
+  --input: #2a3d3a;
+  --ring: #0cc4ac;
+  --brand: #0cc4ac;
+  --brand-foreground: #04231f;
+  --brand-from: #10b981;
+  --brand-to: #05ad98;
+  --sidebar: #14211f;
+  --sidebar-foreground: #eaf3f1;
+  --sidebar-primary: #0cc4ac;
+  --sidebar-primary-foreground: #04231f;
+  --sidebar-accent: #274039;
+  --sidebar-accent-foreground: #eaf3f1;
+  --sidebar-border: #2a3d3a;
+  --sidebar-ring: #0cc4ac;
+}
+
+/* Atardecer — cálida: durazno #F6C992 + teal #09A1A1 */
+[data-palette="atardecer"] {
+  --background: #fbf3ea;
+  --foreground: #2a4249;
+  --card: #ffffff;
+  --card-foreground: #2a4249;
+  --popover: #ffffff;
+  --popover-foreground: #2a4249;
+  --primary: #09a1a1;
+  --primary-foreground: #ffffff;
+  --secondary: #f4e5d6;
+  --secondary-foreground: #30525c;
+  --muted: #f2e7db;
+  --muted-foreground: #857066;
+  --accent: #f7dac9;
+  --accent-foreground: #30525c;
+  --border: #e9d7c5;
+  --input: #e9d7c5;
+  --ring: #09a1a1;
+  --brand: #09a1a1;
+  --brand-foreground: #ffffff;
+  --brand-from: #f6c992;
+  --brand-to: #09a1a1;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #2a4249;
+  --sidebar-primary: #09a1a1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f7dac9;
+  --sidebar-accent-foreground: #30525c;
+  --sidebar-border: #e9d7c5;
+  --sidebar-ring: #09a1a1;
+}
+.dark[data-palette="atardecer"] {
+  --background: #22343a;
+  --foreground: #f3e7db;
+  --card: #2b4148;
+  --card-foreground: #f3e7db;
+  --popover: #2b4148;
+  --popover-foreground: #f3e7db;
+  --primary: #14b3b3;
+  --primary-foreground: #06231f;
+  --secondary: #33474e;
+  --secondary-foreground: #f3e7db;
+  --muted: #33474e;
+  --muted-foreground: #b3c3c8;
+  --accent: #3d5158;
+  --accent-foreground: #f6c992;
+  --border: #3d5158;
+  --input: #3d5158;
+  --ring: #14b3b3;
+  --brand: #14b3b3;
+  --brand-foreground: #06231f;
+  --brand-from: #f6c992;
+  --brand-to: #09a1a1;
+  --sidebar: #2b4148;
+  --sidebar-foreground: #f3e7db;
+  --sidebar-primary: #14b3b3;
+  --sidebar-primary-foreground: #06231f;
+  --sidebar-accent: #3d5158;
+  --sidebar-accent-foreground: #f6c992;
+  --sidebar-border: #3d5158;
+  --sidebar-ring: #14b3b3;
+}
+
+/* Coral — rojo/coral: #B44446 + #FC8F8F */
+[data-palette="coral"] {
+  --background: #faf2f1;
+  --foreground: #3a1a1f;
+  --card: #ffffff;
+  --card-foreground: #3a1a1f;
+  --popover: #ffffff;
+  --popover-foreground: #3a1a1f;
+  --primary: #b44446;
+  --primary-foreground: #ffffff;
+  --secondary: #f4e2e1;
+  --secondary-foreground: #64242f;
+  --muted: #f3e6e5;
+  --muted-foreground: #7d5a5b;
+  --accent: #fcdedd;
+  --accent-foreground: #64242f;
+  --border: #e9d3d2;
+  --input: #e9d3d2;
+  --ring: #b44446;
+  --brand: #b44446;
+  --brand-foreground: #ffffff;
+  --brand-from: #fc8f8f;
+  --brand-to: #b44446;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #3a1a1f;
+  --sidebar-primary: #b44446;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fcdedd;
+  --sidebar-accent-foreground: #64242f;
+  --sidebar-border: #e9d3d2;
+  --sidebar-ring: #b44446;
+}
+.dark[data-palette="coral"] {
+  --background: #241214;
+  --foreground: #f5e5e4;
+  --card: #3a1e21;
+  --card-foreground: #f5e5e4;
+  --popover: #3a1e21;
+  --popover-foreground: #f5e5e4;
+  --primary: #d9605f;
+  --primary-foreground: #2a0f11;
+  --secondary: #3d2427;
+  --secondary-foreground: #f5e5e4;
+  --muted: #3d2427;
+  --muted-foreground: #c7a3a3;
+  --accent: #4a2a2d;
+  --accent-foreground: #fc8f8f;
+  --border: #4a2a2d;
+  --input: #4a2a2d;
+  --ring: #d9605f;
+  --brand: #d9605f;
+  --brand-foreground: #2a0f11;
+  --brand-from: #fc8f8f;
+  --brand-to: #b44446;
+  --sidebar: #3a1e21;
+  --sidebar-foreground: #f5e5e4;
+  --sidebar-primary: #d9605f;
+  --sidebar-primary-foreground: #2a0f11;
+  --sidebar-accent: #4a2a2d;
+  --sidebar-accent-foreground: #fc8f8f;
+  --sidebar-border: #4a2a2d;
+  --sidebar-ring: #d9605f;
+}
+
+/* Safiro — azul zafiro #0474C4 */
+[data-palette="safiro"] {
+  --background: #f1f5fb;
+  --foreground: #1a2436;
+  --card: #ffffff;
+  --card-foreground: #1a2436;
+  --popover: #ffffff;
+  --popover-foreground: #1a2436;
+  --primary: #0474c4;
+  --primary-foreground: #ffffff;
+  --secondary: #e2ebf6;
+  --secondary-foreground: #1a2436;
+  --muted: #eaf1f9;
+  --muted-foreground: #5b6b82;
+  --accent: #dce9f8;
+  --accent-foreground: #06457f;
+  --border: #d3e0ef;
+  --input: #d3e0ef;
+  --ring: #0474c4;
+  --brand: #0474c4;
+  --brand-foreground: #ffffff;
+  --brand-from: #5379ae;
+  --brand-to: #0474c4;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a2436;
+  --sidebar-primary: #0474c4;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dce9f8;
+  --sidebar-accent-foreground: #06457f;
+  --sidebar-border: #d3e0ef;
+  --sidebar-ring: #0474c4;
+}
+.dark[data-palette="safiro"] {
+  --background: #1c2133;
+  --foreground: #e8eef8;
+  --card: #262b40;
+  --card-foreground: #e8eef8;
+  --popover: #262b40;
+  --popover-foreground: #e8eef8;
+  --primary: #3b95e6;
+  --primary-foreground: #ffffff;
+  --secondary: #2e3550;
+  --secondary-foreground: #e8eef8;
+  --muted: #2e3550;
+  --muted-foreground: #a9b7d1;
+  --accent: #333b59;
+  --accent-foreground: #a8c4ec;
+  --border: #333b59;
+  --input: #333b59;
+  --ring: #3b95e6;
+  --brand: #3b95e6;
+  --brand-foreground: #ffffff;
+  --brand-from: #5379ae;
+  --brand-to: #0474c4;
+  --sidebar: #262b40;
+  --sidebar-foreground: #e8eef8;
+  --sidebar-primary: #3b95e6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #333b59;
+  --sidebar-accent-foreground: #a8c4ec;
+  --sidebar-border: #333b59;
+  --sidebar-ring: #3b95e6;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -79,10 +347,12 @@
   --radius-xl: calc(var(--radius) + 4px);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --color-brand: #0891b2;
-  --color-brand-foreground: #ffffff;
-  --color-brand-from: #10b981;
-  --color-brand-to: #0ea5e9;
+  /* Tokens de marca ahora por variable (paletas, B6): cada paleta define
+     --brand/--brand-from/--brand-to en :root/.dark o su bloque [data-palette]. */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-from: var(--brand-from);
+  --color-brand-to: var(--brand-to);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -126,9 +396,18 @@
 }
 
 @utility bg-brand-gradient {
-  background: linear-gradient(135deg, #10b981 0%, #0ea5e9 100%);
+  background: linear-gradient(
+    135deg,
+    var(--brand-from) 0%,
+    var(--brand-to) 100%
+  );
 }
 
 @utility bg-brand-gradient-deep {
-  background: linear-gradient(135deg, #10b981 0%, #0891b2 50%, #0369a1 100%);
+  background: linear-gradient(
+    135deg,
+    var(--brand-from) 0%,
+    var(--brand) 50%,
+    var(--brand-to) 100%
+  );
 }

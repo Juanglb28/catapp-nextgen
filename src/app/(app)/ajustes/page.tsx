@@ -23,6 +23,7 @@ import { TestPushButton } from "@/modules/push/components/test-push-button";
 import { BirthdayBonusSettingsSheet } from "@/modules/tenancy/components/birthday-bonus-settings-sheet";
 import { listBonusOptions } from "@/modules/birthdays/repository";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PaletteSwitcher } from "@/components/palette-switcher";
 
 export const metadata: Metadata = { title: "Ajustes" };
 
@@ -240,6 +241,7 @@ export default async function AjustesPage() {
       <section className="space-y-2">
         <h2 className="text-sm font-medium">Apariencia</h2>
         <ThemeToggle />
+        <PaletteSwitcher />
       </section>
 
       <section className="space-y-2">
