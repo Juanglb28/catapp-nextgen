@@ -110,3 +110,13 @@ true }`.
   `pnpm db:studio`.
 - **Aviso `Cross origin request detected ... /_next/*`**: solo si entras por IP.
   Se silencia con `allowedDevOrigins` en `next.config`, o entrando por localhost.
+- **Studio muestra las tablas vacías / los registros no aparecen** aunque te
+  registraste: casi siempre es que `pnpm dev` y `pnpm db:studio` corren en
+  terminales que apuntan a bases distintas. La variable
+  `$env:DATABASE_URL="…catapp_test"` que exportas para `pnpm test:integration`
+  **es pegajosa**: dura toda esa ventana de PowerShell y tiene prioridad sobre el
+  `.env`. Si arrancas `pnpm dev` en esa misma ventana, la app escribe en
+  `catapp_test` mientras Studio (en otra ventana) lee `catapp`. Regla: usa esa
+  variable **solo** en la ventana de los tests de integración; corre `pnpm dev`
+  y `pnpm db:studio` en terminales **sin** ella. Verifica en Studio → SQL console
+  con `select current_database();`, y en la terminal con `echo $env:DATABASE_URL`.
