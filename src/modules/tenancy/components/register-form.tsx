@@ -28,7 +28,16 @@ export function RegisterForm() {
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", password: "" },
+    // `onTouched`: valida al salir del campo y luego en cada cambio, así el aviso
+    // de "no coinciden" aparece en cuanto la usuaria termina de escribir.
+    mode: "onTouched",
+    defaultValues: {
+      name: "",
+      email: "",
+      confirmEmail: "",
+      password: "",
+      confirmPassword: "",
+    },
   });
 
   async function onSubmit(values: RegisterInput) {
@@ -121,12 +130,50 @@ export function RegisterForm() {
         />
         <FormField
           control={form.control}
+          name="confirmEmail"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirma tu correo</FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="tu@correo.com"
+                  onPaste={(e) => e.preventDefault()}
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
           name="password"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Contraseña</FormLabel>
               <FormControl>
                 <Input type="password" autoComplete="new-password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirma tu contraseña</FormLabel>
+              <FormControl>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  onPaste={(e) => e.preventDefault()}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
