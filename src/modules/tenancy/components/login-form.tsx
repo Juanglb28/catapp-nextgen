@@ -42,8 +42,10 @@ export function LoginForm({ resetOk = false }: { resetOk?: boolean }) {
       password: values.password,
     });
     if (error) {
-      // Better Auth devuelve 403/EMAIL_NOT_VERIFIED si el correo no está confirmado.
-      if (error.status === 403 || error.code === "EMAIL_NOT_VERIFIED") {
+      // Solo el código EMAIL_NOT_VERIFIED cuenta como "correo sin confirmar".
+      // Antes se trataba CUALQUIER 403 así, lo que confundía otros 403 (p. ej.
+      // "Invalid origin") con falta de verificación y ofrecía reenviar en vano.
+      if (error.code === "EMAIL_NOT_VERIFIED") {
         setUnverifiedEmail(values.email);
         return;
       }
