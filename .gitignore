@@ -38,6 +38,13 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Respaldos de base de datos — NUNCA subir (contienen datos reales / PII).
+*.dump
+*.dump.gz
+*.backup
+db-backup*
+catapp-prod-*.sql
+
 # vercel
 .vercel
 
