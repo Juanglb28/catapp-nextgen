@@ -6,6 +6,24 @@ Contexto y comandos detallados en `docs/DEPLOY-STAGING.md`. No empieces la fase
 
 Fecha del cutover: ____________  ·  Responsable: ____________
 
+## Sobre los respaldos (PITR · volume backups · dump)
+
+Tres capas complementarias; ninguna reemplaza a la otra:
+
+- **PITR (activo, plan Pro):** restaura a un servicio Postgres **nuevo** en
+  cualquier momento de la ventana de retención (~26 días). Ideal para recuperar
+  de un error reciente sin perder el delta. Vive **dentro de Railway**.
+- **Volume backups (Railway):** snapshots programados/on-demand del volumen,
+  **independientes** de PITR. Actívalos para cobertura extra (Railway sugiere
+  "keep both"). También viven en Railway.
+- **`pg_dump` off-platform (este checklist):** la única copia **fuera** de
+  Railway, portable y restaurable donde sea. Es tu artefacto de rollback del
+  cutover y tu seguro ante un problema de la propia plataforma o de la cuenta.
+
+Recomendación: mantén PITR + volume backups para lo continuo, y **aun así** toma
+el dump manual del pre-flight. Prueba una restauración al menos una vez (p. ej.
+en la DB de staging) — un backup no probado no cuenta.
+
 ## Datos a tener a mano (rellena antes de empezar)
 
 - DATABASE_URL de **producción**: ______________________________________________
@@ -87,3 +105,9 @@ Fecha del cutover: ____________  ·  Responsable: ____________
 
 > El rollback depende 100% del backup fresco de la Fase 1. Si no lo tienes, no
 > empieces el cutover.
+
+> **Alternativa de recuperación (PITR):** en vez del `pg_restore`, restaura con
+> PITR al momento **justo antes del deploy** (crea un servicio Postgres nuevo) y
+> apunta la app anterior a la `DATABASE_URL` de ese servicio nuevo. Sirve si el
+> dump manual fallara o para volver a un segundo exacto. Aun así, el dump
+> off-platform sigue siendo la red principal (independiente de Railway).
