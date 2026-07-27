@@ -1,7 +1,7 @@
 # Estado del proyecto — CatApp-NextGen
 
 > Fuente de verdad del progreso. Se actualiza al cerrar cada bloque (ver Quality Gate, sección 6 del plan).
-> Última actualización: 2026-07-19.
+> Última actualización: 2026-07-27.
 
 ## Modernización CatApp-NextGen (fork de CatApp @ 14c4167)
 
@@ -274,6 +274,8 @@ Ver `docs/LANZAMIENTO.md` para el checklist pre-lanzamiento y la prueba de humo 
 4. Verifica con Chrome DevTools → Application → Manifest (sin errores) y → Service Workers (activo). Lighthouse (modo móvil) debe marcar la app como **instalable**.
 
 ## Notas
+
+- **Crons en Railway — staging ✅ / producción PENDIENTE (2026-07-27):** Los dos crons (cumpleaños y recordatorio-mañana) quedaron **montados y probados en STAGING** como 2 servicios `node:22-alpine` independientes. Hallazgo clave: Railway ejecuta el *start command* del servicio en el horario y espera que el proceso **TERMINE**; el bloque `[[crons]]` del `railway.toml` **NO es formato válido y se ignora** (producción nunca los corrió solo). Cada cron: imagen `node:22-alpine`, variable `CRON_SECRET` referenciada a la app (`${{<app>.CRON_SECRET}}`), start command `node -e` que hace `POST` al endpoint con `Bearer $CRON_SECRET` y sale, Restart Policy **Never**, Cron Schedule en UTC. `cron-birthdays` → `/api/cron/birthdays`, `0 11 * * *` (6 AM Bogotá); `cron-reminder-tomorrow` → `/api/cron/reminder-tomorrow`, `0 1 * * *` (8 PM). Probados con **Run now**: birthdays `{clients:2, created:1, notified:1}` (idempotente: `created`/`notified` solo suben con bono nuevo), reminder `{tenantsWithCitas:1}`. **⚠️ PENDIENTE (próxima sesión): el CUTOVER a producción** — replicar ambos servicios cron en el proyecto de producción (`Project_Independency_CatApp`, servicio app `CatApp`, URL de prod, `CRON_SECRET` de prod distinto) y ejecutar el resto del checklist. Receta completa en `docs/CRONS.md`; checklist en `docs/CUTOVER-CHECKLIST.md`. Descripciones de ambos proyectos de Railway ya apuntan a esas guías.
 
 - **Auth en producción configurada ✅ (2026-06-11):** `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL` (`https://catapp-production.up.railway.app`) seteadas en Railway; el login funciona en producción. ⚠️ **Pendiente:** rotar `BETTER_AUTH_SECRET` (`openssl rand -base64 32`) al cerrar la app, antes del lanzamiento. `GOOGLE_CLIENT_ID/SECRET` siguen siendo opcionales (login con Google). En local, pon `BETTER_AUTH_SECRET` en `.env` antes de `pnpm build` (en `pnpm dev` no es obligatorio).
 
