@@ -86,10 +86,38 @@ en la DB de staging) — un backup no probado no cuenta.
 
 - [ ] Actualiza URLs de producción en servicios externos si cambió el dominio:
       redirect URIs de Google, webhook de WhatsApp en Meta.
-- [ ] Confirma que los crons quedaron activos (cumpleaños, recordatorio-mañana,
-      y `/api/cron/reminders` si usas WhatsApp).
+- [ ] **Crea los servicios cron en producción** (ver recuadro abajo). Railway NO
+      los toma del `railway.toml`: el bloque `[[crons]]` no es formato válido y se
+      ignora. Cada cron es un **servicio aparte** que corre y termina.
+- [ ] Confirma que los crons quedaron activos: cumpleaños (`0 11 * * *` = 6 AM),
+      recordatorio-mañana (`0 1 * * *` = 8 PM), y `/api/cron/reminders` si usas WhatsApp.
 - [ ] Monitorea errores (Sentry/logs de Railway) las primeras horas.
 - [ ] Comunica que el cambio terminó.
+
+### Cómo crear cada servicio cron en Railway (receta)
+
+Railway ejecuta el **start command** de un servicio en el horario indicado y
+espera que el proceso **termine**. Un servicio web persistente (la app) no puede
+ser su propio cron; por eso cada cron es un servicio independiente y liviano.
+Explicación completa en `docs/CRONS.md`. Probado en staging el 2026-07-27.
+Repetir en el proyecto de producción:
+
+1. **Add → Docker Image** → `node:22-alpine`.
+2. **Variables** → nueva variable `CRON_SECRET` = `${{<servicio-app>.CRON_SECRET}}`
+   (referencia; nunca pegues el valor). En producción el servicio app se llama `CatApp`.
+3. **Settings → Deploy → Custom Start Command** (una línea; ajusta la URL pública y el endpoint):
+   `node -e "fetch('https://<APP-PUBLICA>/api/cron/birthdays',{method:'POST',headers:{Authorization:'Bearer '+process.env.CRON_SECRET}}).then(async r=>{console.log('status',r.status,await r.text());process.exit(r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"`
+4. **Settings → Deploy → Restart Policy** → **Never** (un fallo no reintenta ni duplica notificaciones).
+5. **Settings → Deploy → Cron Schedule** → **Custom** → la expresión del cron (UTC).
+6. **Deploy**. Para probar sin esperar: pestaña **Cron Runs → Run now**; revisa los
+   logs (debe salir `status 200 {...}`).
+
+Servicios a crear (uno por cada horario, Railway solo admite un schedule por servicio):
+
+| Cron | Endpoint | Schedule (UTC) | Hora Bogotá |
+| --- | --- | --- | --- |
+| Cumpleaños | `/api/cron/birthdays` | `0 11 * * *` | 6:00 AM |
+| Recordatorio-mañana | `/api/cron/reminder-tomorrow` | `0 1 * * *` | 8:00 PM |
 
 ---
 
