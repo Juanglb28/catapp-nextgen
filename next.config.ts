@@ -2,16 +2,14 @@ import { withSentryConfig } from "@sentry/nextjs";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
 
-const isDev = process.env.NODE_ENV === "development";
-
 /**
  * Security headers (F10.B1 — RNF-03).
  *
  * CSP notes:
  *  - `script-src 'unsafe-inline'`: required for Next.js 15 inline hydration
  *    scripts. Upgrade to nonce-based CSP when time allows (see SECURITY.md).
- *  - `script-src 'unsafe-eval'` (dev only): webpack dev mode uses eval() for
- *    source maps. Blocked in production to maintain strict CSP.
+ *  - `script-src 'unsafe-eval'`: webpack dev source maps AND reCAPTCHA v3, que
+ *    lo usa para su scoring. Relajación pequeña ('unsafe-inline' ya está puesto).
  *  - `style-src 'unsafe-inline'`: Tailwind v4 injects inline styles.
  *  - `connect-src 'self' *.sentry.io`: Sentry SDK sends events to sentry.io.
  *  - `worker-src 'self'`: Serwist service worker.
@@ -41,9 +39,10 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       // Next.js 15 requires unsafe-inline for hydration; use nonce in the future.
-      // Dev mode: webpack needs unsafe-eval for source maps. Never in production.
-      // google.com + gstatic.com: script de reCAPTCHA v3 (item 9).
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://www.google.com https://www.gstatic.com`,
+      // 'unsafe-eval': lo necesitan webpack en dev (source maps) y reCAPTCHA v3,
+      // que lo usa internamente para su scoring (sin él, el CSP lo bloquea y
+      // degrada la protección). google.com + gstatic.com: script de reCAPTCHA (item 9).
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com",
       // Tailwind v4 and shadcn/ui inject inline styles.
       "style-src 'self' 'unsafe-inline'",
       // Avatars or inline data URIs from shadcn/ui components.
