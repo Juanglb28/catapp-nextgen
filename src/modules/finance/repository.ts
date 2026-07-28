@@ -267,8 +267,11 @@ export async function dailySeries(
       day: sql<string>`to_char(${localDay}, 'YYYY-MM-DD')`,
       total: sql<string>`coalesce(sum(${appointments.totalCop} - ${appointments.bonusDiscountCop}), 0)`,
       tip: sql<string>`coalesce(sum(${appointments.tipCop}), 0)`,
-      efectivo: sql<string>`coalesce(sum(case when ${appointments.paymentMethod} = 'efectivo' then ${appointments.paidCop} else 0 end), 0)`,
-      transferencia: sql<string>`coalesce(sum(case when ${appointments.paymentMethod} = 'transferencia' then ${appointments.paidCop} else 0 end), 0)`,
+      // Desglose por método: si el pago tiene desglose (cash+transfer>0) usa esas
+      // columnas (reparte los combinados); si no, cae al método único legado con
+      // paid_cop (D-14/D-18).
+      efectivo: sql<string>`coalesce(sum(case when (${appointments.cashCop} + ${appointments.transferCop}) > 0 then ${appointments.cashCop} when ${appointments.paymentMethod} = 'efectivo' then ${appointments.paidCop} else 0 end), 0)`,
+      transferencia: sql<string>`coalesce(sum(case when (${appointments.cashCop} + ${appointments.transferCop}) > 0 then ${appointments.transferCop} when ${appointments.paymentMethod} = 'transferencia' then ${appointments.paidCop} else 0 end), 0)`,
     })
     .from(appointments)
     .where(
@@ -403,9 +406,9 @@ export async function monthlyReport(
   // Totales por método de pago (solo citas completadas)
   const [metodoPago] = await db
     .select({
-      efectivo: sql<string>`coalesce(sum(case when ${appointments.paymentMethod} = 'efectivo' then ${appointments.paidCop} else 0 end), 0)`,
-      transferencia: sql<string>`coalesce(sum(case when ${appointments.paymentMethod} = 'transferencia' then ${appointments.paidCop} else 0 end), 0)`,
-      sinMetodo: sql<string>`coalesce(sum(case when ${appointments.paymentMethod} is null then ${appointments.paidCop} else 0 end), 0)`,
+      efectivo: sql<string>`coalesce(sum(case when (${appointments.cashCop} + ${appointments.transferCop}) > 0 then ${appointments.cashCop} when ${appointments.paymentMethod} = 'efectivo' then ${appointments.paidCop} else 0 end), 0)`,
+      transferencia: sql<string>`coalesce(sum(case when (${appointments.cashCop} + ${appointments.transferCop}) > 0 then ${appointments.transferCop} when ${appointments.paymentMethod} = 'transferencia' then ${appointments.paidCop} else 0 end), 0)`,
+      sinMetodo: sql<string>`coalesce(sum(case when (${appointments.cashCop} + ${appointments.transferCop}) > 0 then (${appointments.paidCop} - ${appointments.cashCop} - ${appointments.transferCop}) when ${appointments.paymentMethod} is null then ${appointments.paidCop} else 0 end), 0)`,
       propinas: sql<string>`coalesce(sum(${appointments.tipCop}), 0)`,
     })
     .from(appointments)

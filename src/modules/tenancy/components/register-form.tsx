@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { authClient } from "@/lib/auth-client";
+import { getRecaptchaToken } from "@/lib/recaptcha-client";
 import {
   registerSchema,
   type RegisterInput,
@@ -43,16 +44,21 @@ export function RegisterForm() {
 
   async function onSubmit(values: RegisterInput) {
     setServerError(null);
+    // reCAPTCHA v3: token que Better Auth verifica en el servidor (si está activo).
+    const captchaToken = await getRecaptchaToken("register");
     const { error } = await authClient.signUp.email({
       name: values.name,
       email: values.email,
       password: values.password,
+      ...(captchaToken
+        ? { fetchOptions: { headers: { "x-captcha-response": captchaToken } } }
+        : {}),
     });
     if (error) {
       setServerError(
         error.code === "USER_ALREADY_EXISTS"
           ? "Ya existe una cuenta con ese correo. Inicia sesión."
-          : "No se pudo crear la cuenta. Inténtalo de nuevo.",
+          : "No se pudo crear la cuenta. Si el problema persiste, recarga la página e inténtalo de nuevo.",
       );
       return;
     }

@@ -25,6 +25,9 @@ ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
 ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
 ARG NEXT_PUBLIC_SENTRY_DSN
 ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+# reCAPTCHA v3 site key (pública): se incrusta en el bundle en build.
+ARG NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+ENV NEXT_PUBLIC_RECAPTCHA_SITE_KEY=$NEXT_PUBLIC_RECAPTCHA_SITE_KEY
 
 # Better Auth exige un secret en build. Este es SOLO de build; en runtime Railway inyecta el real.
 RUN BETTER_AUTH_SECRET="build-time-placeholder-not-used-at-runtime" pnpm build

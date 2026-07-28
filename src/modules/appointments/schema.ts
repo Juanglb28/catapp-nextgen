@@ -29,6 +29,10 @@ export const paymentStatus = pgEnum("payment_status", [
   "paid",
 ]);
 
+// Método de pago de método ÚNICO. Los pagos combinados (efectivo + transferencia)
+// NO usan un valor de enum: se representan con cash_cop>0 Y transfer_cop>0 (el
+// método queda null y el desglose vive en esas columnas). Así se evita un
+// `ALTER TYPE ADD VALUE` (que drizzle no puede aplicar dentro de su transacción).
 export const paymentMethodEnum = pgEnum("payment_method", [
   "efectivo",
   "transferencia",
@@ -74,6 +78,15 @@ export const appointments = pgTable(
       .notNull()
       .default(sql`0`),
     tipCop: bigint("tip_cop", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
+    // Desglose del pago por método (COP). Para pagos 'mixto' guardan cuánto se
+    // recibió en efectivo y cuánto por transferencia; su suma acumulada es
+    // consistente con el método derivado. 0/0 en pagos sin método o históricos.
+    cashCop: bigint("cash_cop", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
+    transferCop: bigint("transfer_cop", { mode: "bigint" })
       .notNull()
       .default(sql`0`),
     // Descuento por bono de cumpleaños aplicado a la cita (COP). 0 = sin bono.

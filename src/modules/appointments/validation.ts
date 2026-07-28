@@ -74,24 +74,30 @@ export const editAppointmentSchema = z.object({
 
 export type EditAppointmentInput = z.infer<typeof editAppointmentSchema>;
 
+/**
+ * Registro de pago con desglose por método. `cash`/`transfer` son los montos
+ * (COP) recibidos en efectivo y por transferencia en ESTA operación; su suma es
+ * el abono. El método se DERIVA de cuáles son > 0 (efectivo / transferencia /
+ * mixto). Al menos uno debe ser > 0: sin método/monto no se puede registrar
+ * (items 2,3,4,7). Permite 0/0 solo para el caso de saldo cubierto por bono.
+ */
 export const registerPaymentSchema = z.object({
-  // Permite 0: citas cubiertas por bono de cumpleaños se registran/saldan sin abono.
-  amount: z.number().int().min(0, { message: "Ingresa un monto válido" }),
+  cash: z.number().int().min(0).default(0),
+  transfer: z.number().int().min(0).default(0),
   tip: z.number().int().min(0).optional().default(0),
-  paymentMethod: z.enum(["efectivo", "transferencia"]).nullable().optional(),
 });
 
 /**
- * Ajuste/corrección del pago: fija el monto pagado a un valor EXACTO (puede ser
- * 0 para revertir). No suma como `registerPayment`.
+ * Ajuste/corrección del pago: fija los montos pagados a un valor EXACTO por
+ * método (puede ser 0 para revertir). No suma como `registerPayment`.
  */
 export const adjustPaymentSchema = z.object({
-  amount: z.number().int().min(0, { message: "Ingresa un monto válido" }),
+  cash: z.number().int().min(0).default(0),
+  transfer: z.number().int().min(0).default(0),
   tip: z.number().int().min(0).optional().default(0),
-  paymentMethod: z.enum(["efectivo", "transferencia"]).nullable().optional(),
 });
 
-/** Actualiza solo el método de pago, sin montos. */
+/** Actualiza solo el método de pago, sin montos (etiquetado rápido; no mixto). */
 export const updatePaymentMethodSchema = z.object({
   paymentMethod: z.enum(["efectivo", "transferencia"]).nullable(),
 });

@@ -22,6 +22,7 @@ import {
   applyBonusDiscountAndRedeem,
   cancelAppointment,
   createAppointment,
+  findDuplicateForClient,
   findOverlappingAppointments,
   getAppointment,
   reactivateAppointment,
@@ -98,6 +99,20 @@ export async function createAppointmentAction(
     });
   }
 
+  // Anti-duplicado (bloqueante, NO se puede forzar): misma clienta a la misma
+  // hora exacta ya tiene una cita activa. Distinto del solape de más abajo.
+  const duplicate = await findDuplicateForClient(
+    tenantId,
+    data.clientId,
+    startsAt,
+  );
+  if (duplicate) {
+    return {
+      ok: false,
+      error: "Cita ya creada: esta clienta ya tiene una cita a esa hora.",
+    };
+  }
+
   // Advertencia de solape (no bloquea: el usuario puede forzar).
   if (!data.force) {
     const overlaps = await findOverlappingAppointments(
@@ -157,7 +172,6 @@ export async function createAppointmentAction(
   revalidatePath("/citas");
   return { ok: true, id: appointment.id };
 }
-
 
 function revalidateAppointment(id: string) {
   revalidatePath("/citas");
@@ -283,13 +297,28 @@ export async function registerPaymentAction(
     };
   }
 
+  const cash = BigInt(parsed.data.cash);
+  const transfer = BigInt(parsed.data.transfer);
+  const amount = cash + transfer;
+  const tip = BigInt(parsed.data.tip);
+
+  // Método obligatorio (items 4, 7): sin monto en efectivo ni transferencia no
+  // se puede registrar. El método se deriva del desglose en el repositorio.
+  if (amount <= 0n) {
+    return {
+      ok: false,
+      error:
+        "Seleccione tipo de pago (efectivo, transferencia o ambos) e ingresa el monto.",
+    };
+  }
+
   // Tope: el pago no puede exceder el saldo pendiente (neto = total − bono − pagado).
   // Evita registrar paid_cop > total, que inflaría los ingresos (QA B1). B2.1.
   const appointment = await getAppointment(tenantId, id);
   if (!appointment) return { ok: false, error: "No se encontró la cita." };
   const saldo =
     appointment.totalCop - appointment.bonusDiscountCop - appointment.paidCop;
-  if (BigInt(parsed.data.amount) > saldo) {
+  if (amount > saldo) {
     return {
       ok: false,
       error:
@@ -299,14 +328,10 @@ export async function registerPaymentAction(
     };
   }
 
-  const updated = await registerPayment(
-    tenantId,
-    id,
-    BigInt(parsed.data.amount),
-    userId,
-    BigInt(parsed.data.tip),
-    parsed.data.paymentMethod ?? null,
-  );
+  const updated = await registerPayment(tenantId, id, amount, userId, tip, {
+    cash,
+    transfer,
+  });
   if (!updated) return { ok: false, error: "No se encontró la cita." };
 
   revalidateAppointment(id);
@@ -330,16 +355,14 @@ export async function adjustPaymentAction(
     };
   }
 
-  const updated = await setPaidAmount(
-    tenantId,
-    id,
-    BigInt(parsed.data.amount),
-    userId,
-    {
-      tip: BigInt(parsed.data.tip),
-      paymentMethod: parsed.data.paymentMethod ?? null,
-    },
-  );
+  const cash = BigInt(parsed.data.cash);
+  const transfer = BigInt(parsed.data.transfer);
+
+  const updated = await setPaidAmount(tenantId, id, cash + transfer, userId, {
+    tip: BigInt(parsed.data.tip),
+    cash,
+    transfer,
+  });
   if (!updated) return { ok: false, error: "No se encontró la cita." };
 
   revalidateAppointment(id);
@@ -391,7 +414,11 @@ export async function applyBirthdayBonusAction(
   if (!appointment) return { ok: false, error: "No se encontró la cita." };
   const tz = tenant?.timezone ?? "America/Bogota";
 
-  const bonus = await getActiveBonusForClient(tenantId, appointment.clientId, tz);
+  const bonus = await getActiveBonusForClient(
+    tenantId,
+    appointment.clientId,
+    tz,
+  );
   if (!bonus || bonus.status !== "chosen" || !bonus.chosenOptionId) {
     return { ok: false, error: "La clienta no tiene un bono elegido." };
   }
@@ -429,7 +456,10 @@ export async function applyBirthdayBonusAction(
     });
     if (!updated) return { ok: false, error: "No se encontró la cita." };
   } catch {
-    return { ok: false, error: "No se pudo aplicar el bono. Intenta de nuevo." };
+    return {
+      ok: false,
+      error: "No se pudo aplicar el bono. Intenta de nuevo.",
+    };
   }
 
   revalidateAppointment(id);
@@ -489,6 +519,18 @@ export async function setAppointmentStatusAction(
   if (!appointment) return { ok: false, error: "No se encontró la cita." };
   if (appointment.status !== "scheduled") {
     return { ok: false, error: "La cita ya no se puede cambiar." };
+  }
+
+  // Item 5: para COMPLETAR debe haberse registrado la operación de pago (algún
+  // abono o la cita cubierta por bono). No aplica a cancelar / no asistió.
+  if (parsed.data.status === "completed") {
+    const net = appointment.totalCop - appointment.bonusDiscountCop;
+    if (net > 0n && appointment.paidCop <= 0n) {
+      return {
+        ok: false,
+        error: "Registra el pago antes de completar la cita.",
+      };
+    }
   }
 
   const updated =

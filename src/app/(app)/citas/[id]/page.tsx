@@ -1,4 +1,4 @@
-import { Lock, Pencil, Wallet } from "lucide-react";
+import { Check, FileText, Lock, Pencil, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -181,6 +181,19 @@ export default async function CitaDetailPage({
     clienta: appointment.client.name.trim().split(/\s+/)[0],
     negocio: tenant?.name ?? "",
   });
+  // Propina y método de pago para el comprobante (recibos con propina/método).
+  const receiptTipLabel =
+    appointment.tipCop > 0n ? formatCOP(appointment.tipCop) : null;
+  const receiptMethodLabel =
+    appointment.cashCop > 0n && appointment.transferCop > 0n
+      ? "Efectivo y transferencia"
+      : appointment.cashCop > 0n || appointment.paymentMethod === "efectivo"
+        ? "Efectivo"
+        : appointment.transferCop > 0n ||
+            appointment.paymentMethod === "transferencia"
+          ? "Transferencia"
+          : null;
+
   // Comprobante que se envía al registrar el pago (imagen + mensaje). Se arma
   // como "pagado en total"; si el pago es un abono, el sheet ajusta el saldo y
   // usa el recordatorio de pago como mensaje en lugar del paz y salvo.
@@ -208,6 +221,8 @@ export default async function CitaDetailPage({
                 : null,
             paidLabel: formatCOP(netTotal),
             saldoLabel: null,
+            tipLabel: receiptTipLabel,
+            methodLabel: receiptMethodLabel,
             statusLabel: "Pagada",
             note: null,
           },
@@ -246,6 +261,9 @@ export default async function CitaDetailPage({
               : null,
           paidLabel: formatCOP(appointment.paidCop),
           saldoLabel: saldo > 0n ? formatCOP(saldo) : null,
+          tipLabel: receiptTipLabel,
+          methodLabel:
+            appointment.status === "cancelled" ? null : receiptMethodLabel,
           statusLabel:
             appointment.status === "cancelled" ? "Cancelada" : "Pagada",
           note: null,
@@ -370,9 +388,7 @@ export default async function CitaDetailPage({
           </p>
           <p className="mt-0.5 text-pink-700">
             Regalo:{" "}
-            <span className="font-semibold">
-              {redeemedBonus.chosenOption}
-            </span>{" "}
+            <span className="font-semibold">{redeemedBonus.chosenOption}</span>{" "}
             — descuento aplicado a esta cita. El bono quedó invalidado.
           </p>
         </div>
@@ -519,6 +535,8 @@ export default async function CitaDetailPage({
               defaultAmount={Number(appointment.paidCop)}
               currentTip={Number(appointment.tipCop)}
               currentMethod={appointment.paymentMethod}
+              currentCash={Number(appointment.cashCop)}
+              currentTransfer={Number(appointment.transferCop)}
               trigger={
                 <Button size="sm" variant="outline">
                   <Pencil className="size-4" />
@@ -561,6 +579,29 @@ export default async function CitaDetailPage({
             }
           />
         </section>
+      ) : appointment.status !== "cancelled" && saldo > 0n ? (
+        // Item 6: sin pago registrado, "Enviar comprobante" dispara el flujo de
+        // pago (registra la operación) y el sheet envía el comprobante al final.
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium">Comprobante</h2>
+          <p className="text-muted-foreground text-sm">
+            Aún no registras el pago. Al enviar el comprobante se abrirá el
+            flujo de pago para registrar la operación y luego enviarlo.
+          </p>
+          <RegisterPaymentSheet
+            appointmentId={appointment.id}
+            defaultAmount={Number(saldo > 0n ? saldo : 0n)}
+            currentTip={Number(appointment.tipCop)}
+            currentMethod={appointment.paymentMethod}
+            receipt={paymentReceipt}
+            trigger={
+              <Button>
+                <FileText className="size-4" />
+                Enviar comprobante
+              </Button>
+            }
+          />
+        </section>
       ) : null}
 
       {/* Notas */}
@@ -577,7 +618,27 @@ export default async function CitaDetailPage({
       {appointment.status === "scheduled" ? (
         <section className="space-y-2">
           <h2 className="text-sm font-medium">Estado</h2>
-          <StatusActions appointmentId={appointment.id} />
+          <StatusActions
+            appointmentId={appointment.id}
+            completeSlot={
+              appointment.paymentStatus === "pending" && saldo > 0n ? (
+                <RegisterPaymentSheet
+                  appointmentId={appointment.id}
+                  defaultAmount={Number(saldo > 0n ? saldo : 0n)}
+                  currentTip={Number(appointment.tipCop)}
+                  currentMethod={appointment.paymentMethod}
+                  receipt={paymentReceipt}
+                  completeOnSuccess
+                  trigger={
+                    <Button>
+                      <Check className="size-4" />
+                      Completar
+                    </Button>
+                  }
+                />
+              ) : undefined
+            }
+          />
         </section>
       ) : null}
 

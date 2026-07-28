@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { captcha } from "better-auth/plugins";
 import { Resend } from "resend";
 
 import { db } from "@/lib/db";
@@ -13,7 +14,14 @@ const resend = process.env.RESEND_API_KEY
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-const fromEmail = process.env.RESEND_FROM_EMAIL ?? "CatApp <no-reply@catapp.co>";
+const fromEmail =
+  process.env.RESEND_FROM_EMAIL ?? "CatApp <no-reply@catapp.co>";
+
+// reCAPTCHA v3 (item 9): protege registro y recuperación de contraseña. Se
+// activa solo si hay secret key (patrón "encender con credenciales"); sin ella,
+// el auth funciona sin captcha (dev). El cliente manda el token en el header
+// `x-captcha-response` (ver src/lib/recaptcha-client.ts).
+const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
 
 /**
  * Email verification + account-linking estricto (B3.2, RG-5/H-04). Se activa
@@ -128,5 +136,24 @@ export const auth = betterAuth({
       requireLocalEmailVerified: emailVerificationEnabled,
     },
   },
-  plugins: [nextCookies()],
+  plugins: [
+    // Captcha en registro y recuperación (NO en login: su form no envía token).
+    // El plugin verifica el token del header con Google y rechaza si falla/score bajo.
+    ...(recaptchaSecret
+      ? [
+          captcha({
+            provider: "google-recaptcha",
+            secretKey: recaptchaSecret,
+            minScore: 0.5,
+            endpoints: [
+              "/sign-up/email",
+              "/request-password-reset",
+              "/forget-password",
+            ],
+          }),
+        ]
+      : []),
+    // nextCookies debe ir al final (Better Auth).
+    nextCookies(),
+  ],
 });

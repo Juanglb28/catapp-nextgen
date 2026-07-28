@@ -33,6 +33,10 @@ export type ReceiptData = {
   bonusLabel: string | null;
   paidLabel: string | null;
   saldoLabel: string | null;
+  /** Propina cobrada, ya formateada (es-CO). Se omite si null/ausente. */
+  tipLabel?: string | null;
+  /** Método de pago legible (Efectivo / Transferencia / Efectivo y transferencia). */
+  methodLabel?: string | null;
   /** "Pagada" | "Cancelada" | "Abono". */
   statusLabel: string;
   /**
@@ -257,6 +261,33 @@ export function buildReceiptSvg(data: ReceiptData): string {
           size: 18,
           weight: 600,
           color: COLOR.amber,
+          anchor: "end",
+        }),
+      );
+    }
+
+    // Propina (si aplica).
+    if (data.tipLabel) {
+      y += 34;
+      body.push(text(M, y, "Propina", { size: 18, color: COLOR.muted }));
+      body.push(
+        text(RIGHT, y, data.tipLabel, {
+          size: 18,
+          weight: 600,
+          color: COLOR.green,
+          anchor: "end",
+        }),
+      );
+    }
+
+    // Método de pago (si aplica).
+    if (data.methodLabel) {
+      y += 34;
+      body.push(text(M, y, "Método de pago", { size: 18, color: COLOR.muted }));
+      body.push(
+        text(RIGHT, y, data.methodLabel, {
+          size: 18,
+          weight: 600,
           anchor: "end",
         }),
       );

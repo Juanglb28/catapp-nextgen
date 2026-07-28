@@ -400,6 +400,31 @@ export async function findOverlappingAppointments(
     .orderBy(asc(appointments.startsAt));
 }
 
+/**
+ * Cita EXACTA duplicada: misma clienta a la MISMA hora de inicio (no cancelada).
+ * Distinta del solape (que compara rangos de cualquier clienta): esto bloquea el
+ * registro repetido de la misma cita. Devuelve la primera coincidencia o null.
+ */
+export async function findDuplicateForClient(
+  tenantId: string,
+  clientId: string,
+  startsAt: Date,
+): Promise<Appointment | null> {
+  const rows = await db
+    .select()
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        eq(appointments.clientId, clientId),
+        eq(appointments.startsAt, startsAt),
+        ne(appointments.status, "cancelled"),
+      ),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export type UpdateAppointmentInput = {
   startsAt?: Date;
   endsAt?: Date;
@@ -568,7 +593,14 @@ export async function registerPayment(
   amount: bigint,
   changedBy: string | null = null,
   tip: bigint = 0n,
-  paymentMethod?: "efectivo" | "transferencia" | null,
+  opts: {
+    /** Parte del abono recibida en efectivo (COP). */
+    cash?: bigint;
+    /** Parte del abono recibida por transferencia (COP). */
+    transfer?: bigint;
+    /** Método explícito cuando NO se envía desglose (etiquetado directo). */
+    paymentMethod?: "efectivo" | "transferencia" | null;
+  } = {},
 ): Promise<Appointment | null> {
   return db.transaction(async (tx) => {
     const [current] = await tx
@@ -579,20 +611,43 @@ export async function registerPayment(
       .limit(1);
     if (!current) return null;
 
+    const addCash = opts.cash ?? 0n;
+    const addTransfer = opts.transfer ?? 0n;
     const nextPaid = current.paidCop + amount;
+    const nextCash = current.cashCop + addCash;
+    const nextTransfer = current.transferCop + addTransfer;
     const nextTip = current.tipCop + tip;
     const nextPayment = derivePaymentStatus(
       current.totalCop - current.bonusDiscountCop,
       nextPaid,
     );
 
+    // Método: con desglose se DERIVA de los acumulados. Combinado (ambos > 0)
+    // => null (el desglose lo representan cash_cop/transfer_cop). Sin desglose,
+    // se usa el explícito o se conserva el actual.
+    const splitProvided =
+      opts.cash !== undefined || opts.transfer !== undefined;
+    const nextMethod = splitProvided
+      ? nextCash > 0n && nextTransfer > 0n
+        ? null
+        : nextCash > 0n
+          ? "efectivo"
+          : nextTransfer > 0n
+            ? "transferencia"
+            : current.paymentMethod
+      : opts.paymentMethod !== undefined
+        ? opts.paymentMethod
+        : current.paymentMethod;
+
     const [updated] = await tx
       .update(appointments)
       .set({
         paidCop: nextPaid,
+        cashCop: nextCash,
+        transferCop: nextTransfer,
         tipCop: nextTip,
         paymentStatus: nextPayment,
-        ...(paymentMethod !== undefined ? { paymentMethod } : {}),
+        paymentMethod: nextMethod,
         updatedAt: new Date(),
       })
       .where(and(eq(appointments.tenantId, tenantId), eq(appointments.id, id)))
@@ -633,6 +688,10 @@ export async function setPaidAmount(
   changedBy: string | null = null,
   opts: {
     tip?: bigint;
+    /** Valor EXACTO de efectivo (COP). Si se omite, no se toca. */
+    cash?: bigint;
+    /** Valor EXACTO de transferencia (COP). Si se omite, no se toca. */
+    transfer?: bigint;
     paymentMethod?: "efectivo" | "transferencia" | null;
   } = {},
 ): Promise<Appointment | null> {
@@ -647,6 +706,33 @@ export async function setPaidAmount(
 
     const nextPaid = paidCop < 0n ? 0n : paidCop;
     const nextTip = opts.tip === undefined ? current.tipCop : opts.tip;
+    const splitProvided =
+      opts.cash !== undefined || opts.transfer !== undefined;
+    const nextCash =
+      opts.cash === undefined
+        ? current.cashCop
+        : opts.cash < 0n
+          ? 0n
+          : opts.cash;
+    const nextTransfer =
+      opts.transfer === undefined
+        ? current.transferCop
+        : opts.transfer < 0n
+          ? 0n
+          : opts.transfer;
+    const nextMethod = splitProvided
+      ? nextCash > 0n && nextTransfer > 0n
+        ? null
+        : nextCash > 0n
+          ? "efectivo"
+          : nextTransfer > 0n
+            ? "transferencia"
+            : opts.paymentMethod !== undefined
+              ? opts.paymentMethod
+              : current.paymentMethod
+      : opts.paymentMethod !== undefined
+        ? opts.paymentMethod
+        : current.paymentMethod;
     const nextPayment = derivePaymentStatus(
       current.totalCop - current.bonusDiscountCop,
       nextPaid,
@@ -656,11 +742,11 @@ export async function setPaidAmount(
       .update(appointments)
       .set({
         paidCop: nextPaid,
+        cashCop: nextCash,
+        transferCop: nextTransfer,
         tipCop: nextTip,
         paymentStatus: nextPayment,
-        ...(opts.paymentMethod !== undefined
-          ? { paymentMethod: opts.paymentMethod }
-          : {}),
+        paymentMethod: nextMethod,
         updatedAt: new Date(),
       })
       .where(and(eq(appointments.tenantId, tenantId), eq(appointments.id, id)))

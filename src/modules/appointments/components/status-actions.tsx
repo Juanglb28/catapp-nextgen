@@ -2,7 +2,7 @@
 
 import { Check, UserX } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { type ReactNode, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,18 @@ import {
 import { setAppointmentStatusAction } from "../actions";
 
 /** Acciones de estado para citas agendadas: completar, no asistió, cancelar. */
-export function StatusActions({ appointmentId }: { appointmentId: string }) {
+export function StatusActions({
+  appointmentId,
+  completeSlot,
+}: {
+  appointmentId: string;
+  /**
+   * Reemplazo del botón "Completar". Cuando la cita tiene saldo sin pagar, se
+   * pasa el flujo de pago (que completa la cita al registrar). Si se omite, se
+   * usa el botón directo (item 5).
+   */
+  completeSlot?: ReactNode;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -42,13 +53,15 @@ export function StatusActions({ appointmentId }: { appointmentId: string }) {
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Button
-        disabled={pending}
-        onClick={() => run("completed", "Cita completada")}
-      >
-        <Check className="size-4" />
-        Completar
-      </Button>
+      {completeSlot ?? (
+        <Button
+          disabled={pending}
+          onClick={() => run("completed", "Cita completada")}
+        >
+          <Check className="size-4" />
+          Completar
+        </Button>
+      )}
       <Button
         variant="outline"
         disabled={pending}

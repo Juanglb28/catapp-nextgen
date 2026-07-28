@@ -111,6 +111,10 @@ describe.runIf(TEST_DB)("acciones de edición de cita (integración)", () => {
     const repo = await import("./repository");
     const appt = await createAppt();
 
+    // Item 5: para completar debe registrarse el pago (aquí un abono en efectivo).
+    const abono = await registerPaymentAction(appt.id, { cash: 10000 });
+    expect(abono.ok).toBe(true);
+
     const done = await setAppointmentStatusAction(appt.id, {
       status: "completed",
     });
@@ -121,7 +125,8 @@ describe.runIf(TEST_DB)("acciones de edición de cita (integración)", () => {
     });
     expect(edit.ok).toBe(false);
 
-    const pay = await registerPaymentAction(appt.id, { amount: 25000 });
+    // Aún completada, acepta más pagos (aquí el resto por transferencia).
+    const pay = await registerPaymentAction(appt.id, { transfer: 15000 });
     expect(pay.ok).toBe(true);
 
     const after = await repo.getAppointment(tenantId, appt.id);
