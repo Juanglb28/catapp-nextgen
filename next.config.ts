@@ -42,14 +42,15 @@ const securityHeaders = [
       "default-src 'self'",
       // Next.js 15 requires unsafe-inline for hydration; use nonce in the future.
       // Dev mode: webpack needs unsafe-eval for source maps. Never in production.
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+      // google.com + gstatic.com: script de reCAPTCHA v3 (item 9).
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://www.google.com https://www.gstatic.com`,
       // Tailwind v4 and shadcn/ui inject inline styles.
       "style-src 'self' 'unsafe-inline'",
       // Avatars or inline data URIs from shadcn/ui components.
       "img-src 'self' data: blob:",
       "font-src 'self'",
-      // Sentry SDK sends error events to ingest.sentry.io.
-      "connect-src 'self' *.sentry.io",
+      // Sentry SDK sends error events to ingest.sentry.io; reCAPTCHA valida en google.com.
+      "connect-src 'self' *.sentry.io https://www.google.com",
       // Serwist service worker.
       "worker-src 'self'",
       // Disallow plugins (Flash, etc.).
@@ -58,6 +59,8 @@ const securityHeaders = [
       "base-uri 'self'",
       // Form submissions only to self.
       "form-action 'self'",
+      // reCAPTCHA v3 renderiza su badge/desafío en un iframe de google.com.
+      "frame-src 'self' https://www.google.com",
       // No embedding in iframes.
       "frame-ancestors 'none'",
     ].join("; "),
