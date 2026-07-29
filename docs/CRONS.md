@@ -9,10 +9,10 @@ replicarlos en producción**. Probado y verificado en staging el 2026-07-27.
 
 ## Los dos crons
 
-| Servicio (Railway) | Endpoint | Schedule (UTC) | Hora Bogotá | Qué hace |
-| --- | --- | --- | --- | --- |
-| `cron-birthdays` | `POST /api/cron/birthdays` | `0 11 * * *` | 6:00 AM | Crea el bono de cumpleaños del año y notifica por push a la manicurista. |
-| `cron-reminder-tomorrow` | `POST /api/cron/reminder-tomorrow` | `0 1 * * *` | 8:00 PM | Push a cada negocio con citas al día siguiente. |
+| Servicio (Railway)       | Endpoint                           | Schedule (UTC) | Hora Bogotá | Qué hace                                                                 |
+| ------------------------ | ---------------------------------- | -------------- | ----------- | ------------------------------------------------------------------------ |
+| `cron-birthdays`         | `POST /api/cron/birthdays`         | `0 11 * * *`   | 6:00 AM     | Crea el bono de cumpleaños del año y notifica por push a la manicurista. |
+| `cron-reminder-tomorrow` | `POST /api/cron/reminder-tomorrow` | `0 1 * * *`    | 8:00 PM     | Push a cada negocio con citas al día siguiente.                          |
 
 Hay un tercer endpoint, `POST /api/cron/reminders` (recordatorios de WhatsApp),
 que solo aplica si se usa la integración de WhatsApp. Si se activa, se monta un
@@ -158,3 +158,25 @@ también en `docs/CUTOVER-CHECKLIST.md`), usando:
 - Proyecto: `CatApp_Staging`.
 - App: `catapp-nextgen` (`https://catapp-nextgen-production.up.railway.app`).
 - Crons: `cron-birthdays` (`0 11 * * *`), `cron-reminder-tomorrow` (`0 1 * * *`).
+
+## Referencia rápida (producción) — creados y verificados 2026-07-29
+
+- Proyecto: `Project_Independency_CatApp`, entorno `production`.
+- App: `CatApp` (`https://catapp.beauty`).
+- Ambos servicios cron creados siguiendo la receta de arriba (imagen
+  `node:22-alpine`, `CRON_SECRET` referenciado a `${{CatApp.CRON_SECRET}}`,
+  Restart Policy `Never`).
+- **`cron-birthdays`** (`0 11 * * *` UTC = 6:00 AM Bogotá): probado con
+  "Run now" → `status 200 {"ok":true,"clients":0,"created":0,"notified":0}`.
+- **`cron-reminder-tomorrow`** (`0 1 * * *` UTC = 8:00 PM Bogotá): probado con
+  "Run now" → `status 200 {"ok":true,"tenantsWithCitas":1,"notified":1}`.
+- Hallazgo durante la creación: al ir a agregar `CRON_SECRET` en el primer
+  servicio cron, Railway avisó que la variable **ya existía con un valor**
+  cargado previamente (no documentado en ese momento). Se mantuvo la variable
+  ya existente en el servicio `CatApp` (no se sobrescribió) y ambos crons la
+  referencian con `${{CatApp.CRON_SECRET}}`, nunca con el valor pegado.
+- Nota operativa: al crear el segundo servicio cron se generó por error un
+  servicio adicional llamado "function-bun" (tecleo accidental sobre un atajo
+  global mientras se escribía en el campo de variable). Se eliminó de
+  inmediato desde Settings → Danger → Delete Service, confirmando el nombre.
+  Ambos servicios cron finales quedaron limpios, sin rastro de ese incidente.

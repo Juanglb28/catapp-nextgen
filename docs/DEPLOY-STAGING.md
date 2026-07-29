@@ -41,6 +41,25 @@ migraciones nunca tocan los datos reales.
 
 ## 2. Paso 0 — Respaldo de la base de datos de producción
 
+> ⚠️ **Antes de correr CUALQUIER comando contra una connection string** (`pg_dump`,
+> y sobre todo `pg_restore`/`psql` con algo destructivo), verificá primero con una
+> consulta de solo lectura que estás apuntando al entorno correcto:
+>
+> ```bash
+> psql "postgresql://...URL..." -c "SELECT current_database();"
+> ```
+>
+> Producción y staging viven en **proyectos distintos de Railway** con host y
+> puerto de proxy **distintos** (ej. producción en el puerto `13358`, staging en
+> el `41493` — los tuyos van a ser otros, pero nunca coinciden entre entornos).
+> Es fácil reutilizar por error la connection string que tenías copiada de un
+> paso anterior (pasó durante el cutover del 2026-07-29: se restauró producción
+> sobre sí misma por reusar su propia connection string pensando que era la de
+> staging — sin daño porque no hubo escrituras en la ventana, pero pudo no serlo).
+> Cada vez que cambies de entorno, andá de nuevo a Railway → el proyecto correcto
+> → servicio Postgres → pestaña **Connect**, no reuses una URL de un mensaje
+> anterior sin volver a mirar de qué proyecto salió.
+
 Es de **solo lectura** (`pg_dump` no modifica nada). Hazlo antes de cualquier
 cosa. Necesitas la connection string pública de tu Postgres de producción en
 Railway (servicio Postgres → pestaña **Connect** → "Postgres Connection URL").
@@ -104,7 +123,12 @@ Si prefieres, crea la rama de respaldo desde main en cualquier momento con
 1. En tu proyecto de Railway, añade un **nuevo servicio PostgreSQL** (será la DB
    de staging, separada de la de producción). Usa la misma versión mayor que
    producción.
-2. **Restaura** el backup de producción en esa base nueva:
+2. **Restaura** el backup de producción en esa base nueva. **Antes de este
+   comando**, corré la verificación de entorno de la Fase 0 contra ESTA connection
+   string (la de staging) — confirmá que `current_database()` responde y que los
+   counts de tenants/clients/appointments son los de **staging** (probablemente
+   distintos a los de producción), no reutilices la URL de producción del paso
+   anterior:
 
 ```bash
 # Formato custom (.dump):
@@ -157,9 +181,9 @@ separadas (no reutilices las de producción a ciegas). Detalle paso a paso en
   agrega a la MISMA credencial (o crea una para staging):
   - Authorized JavaScript origins: `https://<staging>.up.railway.app`
   - Authorized redirect URIs: `https://<staging>.up.railway.app/api/auth/callback/google`
-  Pon `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` en staging. Para Calendar,
-  genera un `GOOGLE_TOKEN_KEY` (`openssl rand -base64 32`) **propio de staging**
-  (distinto al de prod: cifra los refresh_token con AES).
+    Pon `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` en staging. Para Calendar,
+    genera un `GOOGLE_TOKEN_KEY` (`openssl rand -base64 32`) **propio de staging**
+    (distinto al de prod: cifra los refresh_token con AES).
 - **Resend (correos de verificación y reset):** en modo prueba (sin dominio
   verificado) solo envía desde `onboarding@resend.dev` y hacia tu propio correo
   de Resend — suficiente para probar. Para envío real, verifica un dominio y usa
@@ -204,28 +228,28 @@ separadas (no reutilices las de producción a ciegas). Detalle paso a paso en
 
 Fuente: `.env.example`. **Req.** = obligatoria para arrancar en producción.
 
-| Variable | Req. | Para qué / dónde se obtiene |
-| --- | --- | --- |
-| `DATABASE_URL` | ✅ | Postgres del servicio (Railway la inyecta). En staging, la DB de staging. |
-| `BETTER_AUTH_SECRET` | ✅ | `openssl rand -base64 32`. Firma sesiones y cookies. **Distinto por entorno.** |
-| `BETTER_AUTH_URL` | ✅ | URL pública del entorno (`https://…`). |
-| `APP_LOCK_SECRET` | — | Opcional; clave dedicada del app-lock. Si falta, usa `BETTER_AUTH_SECRET`. |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | — | Orígenes extra (CSV, sin espacios). Normalmente no hace falta si entras por la URL de `BETTER_AUTH_URL`. |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Login con Google + Calendar. Google Cloud Console. |
-| `GOOGLE_TOKEN_KEY` | — | `openssl rand -base64 32`. Cifra refresh_token de Google. **Distinto por entorno.** |
-| `RESEND_API_KEY` | — | Correos (verificación/reset). Con ella se ACTIVA la verificación de email. resend.com/api-keys. |
-| `RESEND_FROM_EMAIL` | — | Remitente. En prueba: `onboarding@resend.dev`. |
-| `TRUSTED_PROXY_HOPS` | — | `1` en Railway. Resuelve la IP real (rate-limit). |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | — | Push. `npx web-push generate-vapid-keys`. Las 3 juntas o ninguna. |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | — | Igual a `VAPID_PUBLIC_KEY`. **Se incrusta en build.** |
-| `WA_PHONE_NUMBER_ID` / `WA_ACCESS_TOKEN` / `WA_VERIFY_TOKEN` / `WA_APP_SECRET` | — | WhatsApp Cloud API (Meta). Vacías = módulo inerte. |
-| `WA_TEMPLATE_REMINDER` / `WA_TEMPLATE_CONFIRMATION` | — | Nombres de plantillas aprobadas (opcional). |
-| `CRON_SECRET` | — | Protege los crons. `openssl rand -base64 32`. |
-| `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` | — | Monitoreo de errores. **La pública se incrusta en build.** |
-| `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | — | Subida de source maps en CI (no en local). |
-| `LOG_LEVEL` | — | `debug`\|`info`\|`warn`\|`error`. Default `info`. |
-| `DB_POOL_MAX` | — | Máx. conexiones del pool. Default 20. |
-| `TEST_DATABASE_URL` / `E2E_*` | — | Solo para tests; no en producción. |
+| Variable                                                                       | Req. | Para qué / dónde se obtiene                                                                              |
+| ------------------------------------------------------------------------------ | ---- | -------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                 | ✅   | Postgres del servicio (Railway la inyecta). En staging, la DB de staging.                                |
+| `BETTER_AUTH_SECRET`                                                           | ✅   | `openssl rand -base64 32`. Firma sesiones y cookies. **Distinto por entorno.**                           |
+| `BETTER_AUTH_URL`                                                              | ✅   | URL pública del entorno (`https://…`).                                                                   |
+| `APP_LOCK_SECRET`                                                              | —    | Opcional; clave dedicada del app-lock. Si falta, usa `BETTER_AUTH_SECRET`.                               |
+| `BETTER_AUTH_TRUSTED_ORIGINS`                                                  | —    | Orígenes extra (CSV, sin espacios). Normalmente no hace falta si entras por la URL de `BETTER_AUTH_URL`. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`                                    | —    | Login con Google + Calendar. Google Cloud Console.                                                       |
+| `GOOGLE_TOKEN_KEY`                                                             | —    | `openssl rand -base64 32`. Cifra refresh_token de Google. **Distinto por entorno.**                      |
+| `RESEND_API_KEY`                                                               | —    | Correos (verificación/reset). Con ella se ACTIVA la verificación de email. resend.com/api-keys.          |
+| `RESEND_FROM_EMAIL`                                                            | —    | Remitente. En prueba: `onboarding@resend.dev`.                                                           |
+| `TRUSTED_PROXY_HOPS`                                                           | —    | `1` en Railway. Resuelve la IP real (rate-limit).                                                        |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`                     | —    | Push. `npx web-push generate-vapid-keys`. Las 3 juntas o ninguna.                                        |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`                                                 | —    | Igual a `VAPID_PUBLIC_KEY`. **Se incrusta en build.**                                                    |
+| `WA_PHONE_NUMBER_ID` / `WA_ACCESS_TOKEN` / `WA_VERIFY_TOKEN` / `WA_APP_SECRET` | —    | WhatsApp Cloud API (Meta). Vacías = módulo inerte.                                                       |
+| `WA_TEMPLATE_REMINDER` / `WA_TEMPLATE_CONFIRMATION`                            | —    | Nombres de plantillas aprobadas (opcional).                                                              |
+| `CRON_SECRET`                                                                  | —    | Protege los crons. `openssl rand -base64 32`.                                                            |
+| `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN`                                        | —    | Monitoreo de errores. **La pública se incrusta en build.**                                               |
+| `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT`                          | —    | Subida de source maps en CI (no en local).                                                               |
+| `LOG_LEVEL`                                                                    | —    | `debug`\|`info`\|`warn`\|`error`. Default `info`.                                                        |
+| `DB_POOL_MAX`                                                                  | —    | Máx. conexiones del pool. Default 20.                                                                    |
+| `TEST_DATABASE_URL` / `E2E_*`                                                  | —    | Solo para tests; no en producción.                                                                       |
 
 ---
 
