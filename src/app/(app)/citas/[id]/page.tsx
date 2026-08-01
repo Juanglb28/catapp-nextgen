@@ -564,13 +564,6 @@ export default async function CitaDetailPage({
       {/* Comprobante para la clienta (cita pagada o cancelada) */}
       {receiptData ? (
         <section className="space-y-2">
-          <h2 className="text-sm font-medium">Comprobante</h2>
-          <p className="text-muted-foreground text-sm">
-            {receiptData.variant === "cancelled"
-              ? "Envía a la clienta un comprobante de la cancelación."
-              : "Reenvía el comprobante de la cita pagada (imagen + mensaje)."}{" "}
-            La vista pública de la cita ya no está disponible.
-          </p>
           <ReceiptButton
             data={receiptData}
             phone={appointment.client.phone}
