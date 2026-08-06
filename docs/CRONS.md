@@ -7,16 +7,17 @@ replicarlos en producción**. Probado y verificado en staging el 2026-07-27.
 > Resumen para el cutover: la receta paso a paso está también en
 > `docs/CUTOVER-CHECKLIST.md`. Este documento es la explicación completa.
 
-## Los dos crons
+## Los crons
 
-| Servicio (Railway)       | Endpoint                           | Schedule (UTC) | Hora Bogotá | Qué hace                                                                 |
-| ------------------------ | ---------------------------------- | -------------- | ----------- | ------------------------------------------------------------------------ |
-| `cron-birthdays`         | `POST /api/cron/birthdays`         | `0 11 * * *`   | 6:00 AM     | Crea el bono de cumpleaños del año y notifica por push a la manicurista. |
-| `cron-reminder-tomorrow` | `POST /api/cron/reminder-tomorrow` | `0 1 * * *`    | 8:00 PM     | Push a cada negocio con citas al día siguiente.                          |
+| Servicio (Railway)         | Endpoint                             | Schedule (UTC) | Hora Bogotá | Qué hace                                                                 |
+| --------------------------- | ------------------------------------- | -------------- | ----------- | ------------------------------------------------------------------------ |
+| `cron-birthdays`           | `POST /api/cron/birthdays`           | `0 11 * * *`   | 6:00 AM     | Crea el bono de cumpleaños del año y notifica por push a la manicurista. |
+| `cron-reminder-tomorrow`   | `POST /api/cron/reminder-tomorrow`   | `0 1 * * *`    | 8:00 PM     | Push a cada negocio con citas al día siguiente.                          |
+| `cron-cleanup-unverified`  | `POST /api/cron/cleanup-unverified`  | `0 8 * * *`    | 3:00 AM     | Borra cuentas con correo sin verificar más viejas de 48h (D-22).         |
 
-Hay un tercer endpoint, `POST /api/cron/reminders` (recordatorios de WhatsApp),
+Hay un cuarto endpoint, `POST /api/cron/reminders` (recordatorios de WhatsApp),
 que solo aplica si se usa la integración de WhatsApp. Si se activa, se monta un
-servicio cron igual a estos dos con su propio horario.
+servicio cron igual a estos con su propio horario.
 
 Todos los endpoints están protegidos por `Authorization: Bearer <CRON_SECRET>` y
 responden `200` con un JSON de resumen.
@@ -78,6 +79,12 @@ node -e "fetch('https://<APP-PUBLICA>/api/cron/birthdays',{method:'POST',headers
 node -e "fetch('https://<APP-PUBLICA>/api/cron/reminder-tomorrow',{method:'POST',headers:{Authorization:'Bearer '+process.env.CRON_SECRET}}).then(async r=>{console.log('status',r.status,await r.text());process.exit(r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"
 ```
 
+`cron-cleanup-unverified`:
+
+```
+node -e "fetch('https://<APP-PUBLICA>/api/cron/cleanup-unverified',{method:'POST',headers:{Authorization:'Bearer '+process.env.CRON_SECRET}}).then(async r=>{console.log('status',r.status,await r.text());process.exit(r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"
+```
+
 URL pública de staging: `https://catapp-nextgen-production.up.railway.app`.
 En producción, usar el dominio de producción (p. ej. `https://catapp.beauty`).
 
@@ -89,8 +96,8 @@ En producción, usar el dominio de producción (p. ej. `https://catapp.beauty`).
 4. **Settings → Deploy → Restart Policy** → **Never**.
 5. **Settings → Deploy → Cron Schedule** → **Custom** → la expresión UTC.
 6. **Deploy**.
-7. Renombrar el servicio a `cron-birthdays` / `cron-reminder-tomorrow`
-   (doble clic en el nombre del servicio).
+7. Renombrar el servicio a `cron-birthdays` / `cron-reminder-tomorrow` /
+   `cron-cleanup-unverified` (doble clic en el nombre del servicio).
 
 ## Cómo probarlo sin esperar al horario
 
@@ -112,6 +119,13 @@ status 200 {"ok":true,"clients":N,"created":C,"notified":M}
 ```
 Starting Container
 status 200 {"ok":true,"tenantsWithCitas":N,"notified":M}
+```
+
+`cron-cleanup-unverified` (nuevo 2026-08-06, aún **no probado en staging/producción**):
+
+```
+Starting Container
+status 200 {"ok":true,"deleted":N,"staleHours":48}
 ```
 
 ## Semántica del resultado (idempotencia)
@@ -158,6 +172,8 @@ también en `docs/CUTOVER-CHECKLIST.md`), usando:
 - Proyecto: `CatApp_Staging`.
 - App: `catapp-nextgen` (`https://catapp-nextgen-production.up.railway.app`).
 - Crons: `cron-birthdays` (`0 11 * * *`), `cron-reminder-tomorrow` (`0 1 * * *`).
+- **Pendiente:** crear `cron-cleanup-unverified` (`0 8 * * *`) aquí también,
+  antes de replicarlo en producción — ver D-22 en `docs/DECISIONES.md`.
 
 ## Referencia rápida (producción) — creados y verificados 2026-07-29
 
@@ -180,3 +196,5 @@ también en `docs/CUTOVER-CHECKLIST.md`), usando:
   global mientras se escribía en el campo de variable). Se eliminó de
   inmediato desde Settings → Danger → Delete Service, confirmando el nombre.
   Ambos servicios cron finales quedaron limpios, sin rastro de ese incidente.
+- **Pendiente:** crear `cron-cleanup-unverified` (`0 8 * * *`) aquí también
+  (después de probarlo primero en staging) — ver D-22 en `docs/DECISIONES.md`.

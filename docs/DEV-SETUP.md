@@ -69,6 +69,32 @@ Sin estas variables, la función queda inerte pero la app arranca:
   y **hacia** la dirección con la que registraste tu cuenta de Resend. Nota:
   con `RESEND_API_KEY` configurada se **activa** la verificación de email en el
   registro.
+  - **Síntoma: registras una cuenta nueva y el flujo se queda atascado porque
+    el correo de verificación nunca llega** (aunque el log de `pnpm dev`
+    muestre el POST a `sign-up/email` en `200` y el payload que se intentó
+    enviar). Causa más común: `RESEND_FROM_EMAIL` sigue apuntando al
+    remitente de sandbox (`onboarding@resend.dev`), que **solo entrega al
+    dueño de la cuenta de Resend** — si registras con cualquier otro correo,
+    Resend no lo entrega, aunque la llamada a la API "se vea bien" en el log
+    de la app (ese log es lo que se *intentó* enviar, no una confirmación de
+    entrega). Fix: si ya verificaste un dominio propio en Resend (pestaña
+    **Domains**), pon en tu `.env` un remitente de ese dominio, p. ej.
+    `RESEND_FROM_EMAIL="CatApp <no-reply@tudominio>"`, y **reinicia
+    `pnpm dev`** (las env vars se leen solo al arrancar). Si el correo sigue
+    sin llegar después de eso: (1) revisa la pestaña **Logs** del dashboard de
+    Resend para ver si la llamada llegó y qué pasó (entregado/rebotado/error)
+    — es la fuente de verdad, más confiable que el log de la app; (2) revisa
+    con `pnpm db:studio` si ya existe un usuario sin verificar con ese mismo
+    correo de un intento anterior, lo que puede cambiar el comportamiento del
+    reenvío.
+  - **Resuelto 2026-08-06 (D-22):** confirmado en vivo — el flujo de sign-up →
+    correo → verificación funciona bien una vez `RESEND_FROM_EMAIL` apunta a un
+    dominio verificado. El botón "Reenviar correo de confirmación" (que ya
+    existía en `login-form.tsx`) ahora además queda protegido por el mismo
+    rate-limit del resto de auth, y un cron nuevo (`cron-cleanup-unverified`)
+    borra a diario las cuentas nunca verificadas más viejas de 48h, para que
+    un correo abandonado en pruebas no quede "reservado" para siempre. Ver
+    `docs/CRONS.md` y `docs/DECISIONES.md` (D-22).
 - **Google OAuth**, **WhatsApp**, **VAPID/push**: ver `.env.example`.
 
 ## 3. Migraciones y arranque

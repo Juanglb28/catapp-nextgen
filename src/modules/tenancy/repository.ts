@@ -1,6 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { user } from "@/modules/tenancy/auth-schema";
 import { memberships, type Tenant, tenants } from "@/modules/tenancy/schema";
 
 /** Actualiza los datos públicos del negocio (F4.B1). */
@@ -73,4 +74,23 @@ export async function createTenantWithOwner(
 
     return { tenantId: tenant.id };
   });
+}
+
+/**
+ * Borra cuentas que nunca confirmaron su correo y ya vencieron (cron de
+ * limpieza, ver `docs/CRONS.md`). Seguro: el tenant/membership recién se crea
+ * en el onboarding, que exige sesión (= correo verificado) — una cuenta sin
+ * verificar nunca tiene tenant propio, así que no deja nada huérfano. Las
+ * filas de `session`/`account` de ese usuario caen solas por `onDelete:
+ * cascade`. Evita que un correo quede "reservado" para siempre por una cuenta
+ * abandonada (typo, bot, o alguien que nunca volvió a hacer clic en el enlace).
+ */
+export async function deleteStaleUnverifiedUsers(
+  olderThan: Date,
+): Promise<number> {
+  const deleted = await db
+    .delete(user)
+    .where(and(eq(user.emailVerified, false), lt(user.createdAt, olderThan)))
+    .returning({ id: user.id });
+  return deleted.length;
 }

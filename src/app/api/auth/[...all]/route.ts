@@ -9,17 +9,24 @@ const handler = toNextJsHandler(auth);
 export const { GET } = handler;
 
 /**
- * POST handler con rate limiting durable en sign-in / sign-up (B3.3).
+ * POST handler con rate limiting durable en sign-in / sign-up / reenvío de
+ * verificación (B3.3).
  *
  * Límite: 10 intentos por IP por minuto → 429. El resto de rutas de auth
  * (sign-out, etc.) no se limitan.
+ *
+ * `send-verification-email` está incluido a propósito: es la ruta que usa el
+ * botón "Reenviar correo de confirmación" (`login-form.tsx`), no requiere
+ * contraseña ni sesión, y sin límite alguien podría usarla para bombardear de
+ * correos la bandeja de un tercero (con solo saber su email).
  */
 export async function POST(request: Request) {
   const url = new URL(request.url);
 
   const isAuthPath =
     url.pathname.startsWith("/api/auth/sign-in") ||
-    url.pathname.startsWith("/api/auth/sign-up");
+    url.pathname.startsWith("/api/auth/sign-up") ||
+    url.pathname.startsWith("/api/auth/send-verification-email");
 
   if (isAuthPath) {
     const ip = getClientIp(request);
