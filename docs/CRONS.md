@@ -99,6 +99,22 @@ En producción, usar el dominio de producción (p. ej. `https://catapp.beauty`).
 7. Renombrar el servicio a `cron-birthdays` / `cron-reminder-tomorrow` /
    `cron-cleanup-unverified` (doble clic en el nombre del servicio).
 
+**Importante — crear el servicio desde la UI de Railway, no por API/MCP:** un
+servicio cron creado vía la API/MCP de Railway (`create-service`) quedó, en la
+práctica, con `multiRegionConfig`/`numReplicas:1` implícito, lo que lo hace
+comportarse como un servicio **persistente** (1 réplica corriendo 24/7) en vez
+de un job que arranca-corre-sale con el cron. Síntoma: el contenedor se queda
+en `ACTIVE` para siempre, solo loguea `Starting Container` y nunca ejecuta el
+`node -e` (el endpoint de la app nunca recibe la request). Los servicios
+`cron-birthdays`/`cron-reminder-tomorrow`, creados a mano en la UI, nunca
+tuvieron este campo y siempre funcionaron. Fix cuando pasa: borrar el servicio
+(Settings → Danger → Delete Service) y recrearlo desde **Add → Docker Image**
+en la UI del dashboard, siguiendo la receta de arriba. Nota aparte: este
+proyecto usa el flujo de **staged changes** de Railway (barra superior "Apply
+N changes" / botón **Deploy**) — los cambios de Settings no toman efecto hasta
+apretar ese botón, aunque herramientas API muestren la config como ya
+aplicada.
+
 ## Cómo probarlo sin esperar al horario
 
 En la pestaña **Cron Runs** del servicio hay un botón **Run now** que dispara una
@@ -121,7 +137,7 @@ Starting Container
 status 200 {"ok":true,"tenantsWithCitas":N,"notified":M}
 ```
 
-`cron-cleanup-unverified` (nuevo 2026-08-06, aún **no probado en staging/producción**):
+`cron-cleanup-unverified` (nuevo 2026-08-06, probado en staging y producción):
 
 ```
 Starting Container
@@ -171,9 +187,9 @@ también en `docs/CUTOVER-CHECKLIST.md`), usando:
 
 - Proyecto: `CatApp_Staging`.
 - App: `catapp-nextgen` (`https://catapp-nextgen-production.up.railway.app`).
-- Crons: `cron-birthdays` (`0 11 * * *`), `cron-reminder-tomorrow` (`0 1 * * *`).
-- **Pendiente:** crear `cron-cleanup-unverified` (`0 8 * * *`) aquí también,
-  antes de replicarlo en producción — ver D-22 en `docs/DECISIONES.md`.
+- Crons: `cron-birthdays` (`0 11 * * *`), `cron-reminder-tomorrow` (`0 1 * * *`),
+  `cron-cleanup-unverified` (`0 8 * * *`) — probado con "Run now" → `status 200
+  {"ok":true,"deleted":0,"staleHours":48}` (2026-08-06).
 
 ## Referencia rápida (producción) — creados y verificados 2026-07-29
 
@@ -186,6 +202,8 @@ también en `docs/CUTOVER-CHECKLIST.md`), usando:
   "Run now" → `status 200 {"ok":true,"clients":0,"created":0,"notified":0}`.
 - **`cron-reminder-tomorrow`** (`0 1 * * *` UTC = 8:00 PM Bogotá): probado con
   "Run now" → `status 200 {"ok":true,"tenantsWithCitas":1,"notified":1}`.
+- **`cron-cleanup-unverified`** (`0 8 * * *` UTC = 3:00 AM Bogotá): probado con
+  "Run now" → `status 200 {"ok":true,"deleted":0,"staleHours":48}` (2026-08-06).
 - Hallazgo durante la creación: al ir a agregar `CRON_SECRET` en el primer
   servicio cron, Railway avisó que la variable **ya existía con un valor**
   cargado previamente (no documentado en ese momento). Se mantuvo la variable
@@ -196,5 +214,5 @@ también en `docs/CUTOVER-CHECKLIST.md`), usando:
   global mientras se escribía en el campo de variable). Se eliminó de
   inmediato desde Settings → Danger → Delete Service, confirmando el nombre.
   Ambos servicios cron finales quedaron limpios, sin rastro de ese incidente.
-- **Pendiente:** crear `cron-cleanup-unverified` (`0 8 * * *`) aquí también
-  (después de probarlo primero en staging) — ver D-22 en `docs/DECISIONES.md`.
+- `cron-cleanup-unverified` creado y probado el 2026-08-06 (ver D-22 en
+  `docs/DECISIONES.md`).
