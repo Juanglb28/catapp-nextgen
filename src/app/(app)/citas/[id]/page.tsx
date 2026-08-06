@@ -228,6 +228,7 @@ export default async function CitaDetailPage({
           },
           netTotalCop: Number(netTotal),
           alreadyPaidCop: Number(appointment.paidCop),
+          alreadyTipCop: Number(appointment.tipCop),
           phone: appointment.client.phone,
           fullCaption: thankyouWaText,
           partialTemplate: templates.payment_reminder,
@@ -523,6 +524,12 @@ export default async function CitaDetailPage({
             {formatCOP(saldo > 0n ? saldo : 0n)}
           </span>
         </div>
+        {appointment.tipCop > 0n ? (
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground text-sm">Propina</span>
+            <span>{formatCOP(appointment.tipCop)}</span>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between pt-1">
           <Badge className={paymentBadgeClass(appointment.paymentStatus)}>
             {PAYMENT_LABEL[appointment.paymentStatus] ??

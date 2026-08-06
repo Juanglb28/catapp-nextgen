@@ -41,6 +41,8 @@ export type PaymentReceipt = {
   base: ReceiptData;
   netTotalCop: number;
   alreadyPaidCop: number;
+  /** Propina ya registrada antes de este pago (COP); el form solo suma la nueva. */
+  alreadyTipCop: number;
   phone: string;
   /** Texto de paz y salvo (ya renderizado) para el pago completo. */
   fullCaption: string;
@@ -204,10 +206,15 @@ export function RegisterPaymentSheet({
   async function sendReceipt(cfg: PaymentReceipt, paidNow: number, m: Method) {
     const newPaid = cfg.alreadyPaidCop + paidNow;
     const fullyPaid = newPaid >= cfg.netTotalCop;
+    // La propina del formulario es un abono más (igual que cash/transfer): hay
+    // que sumarla a la ya registrada, no reemplazarla. `cfg.base.tipLabel` es
+    // el snapshot del servidor ANTES de este pago, por eso no sirve solo.
+    const newTip = cfg.alreadyTipCop + tip;
 
     const data: ReceiptData = {
       ...cfg.base,
       methodLabel: methodLabel(m),
+      tipLabel: newTip > 0 ? formatCOP(newTip) : null,
       ...(fullyPaid
         ? {}
         : {
