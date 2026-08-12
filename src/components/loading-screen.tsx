@@ -3,7 +3,7 @@ export function LoadingScreen({ message = "Cargando…" }: { message?: string })
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-7 bg-black px-6 text-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/icons/icon-512.png"
+        src="/icons/icon-192.png"
         alt="CatApp"
         width={160}
         height={160}
