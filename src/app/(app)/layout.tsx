@@ -27,13 +27,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
       <header className="bg-background/90 sticky top-0 z-40 flex h-14 items-center justify-between border-b px-4 backdrop-blur">
-        <div>
-          <p className="text-primary text-base leading-tight font-bold tracking-tight">
-            CatApp 💅
-          </p>
-          <p className="text-muted-foreground truncate text-[11px] leading-tight">
-            {name}
-          </p>
+        <div className="flex items-center gap-1.5">
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            aria-hidden
+            className="size-[18px] shrink-0 rounded-[5px]"
+          />
+          <div>
+            <p className="text-primary text-base leading-tight font-bold tracking-tight">
+              CatApp
+            </p>
+            <p className="text-muted-foreground truncate text-[11px] leading-tight">
+              {name}
+            </p>
+          </div>
         </div>
         <div
           aria-hidden
