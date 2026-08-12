@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             src="/icons/icon-192.png"
             alt=""
             aria-hidden
-            className="size-[18px] shrink-0 rounded-[5px]"
+            className="size-[23px] shrink-0 rounded-[6px]"
           />
           <div>
             <p className="text-primary text-base leading-tight font-bold tracking-tight">
