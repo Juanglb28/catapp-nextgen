@@ -1,4 +1,4 @@
-import { normalizePhoneCO } from "@/lib/phone";
+import { normalizePhone } from "@/lib/phone";
 import {
   fetchGoogleContacts,
   getAccessTokenForSettings,
@@ -8,14 +8,14 @@ import { getGoogleAccount } from "@/modules/calendar/repository";
 
 /**
  * Contacto de Google preparado para la pantalla de importación.
- * `importable` indica si tiene un teléfono colombiano válido.
+ * `importable` indica si tiene un teléfono válido (colombiano o internacional).
  */
 export type PreparedContact = {
   resourceName: string;
   name: string;
   /** Teléfono tal como viene de Google (para mostrar en la UI). */
   phone: string | null;
-  /** E.164 (+57XXXXXXXXXX) o null si no es colombiano. */
+  /** E.164 (+57XXXXXXXXXX, o +indicativo... para otros países) o null si no es válido. */
   phoneNormalized: string | null;
   email: string | null;
   /** "YYYY-MM-DD" extraído de Google Contacts, o null si no tiene. */
@@ -80,7 +80,7 @@ function prepareContact(contact: GoogleContact): PreparedContact {
   const name = contact.names?.[0]?.displayName?.trim() ?? "";
   const phone = contact.phoneNumbers?.[0]?.value?.trim() ?? null;
   const email = contact.emailAddresses?.[0]?.value?.trim() ?? null;
-  const phoneNormalized = phone ? normalizePhoneCO(phone) : null;
+  const phoneNormalized = phone ? normalizePhone(phone) : null;
   const birthdayDate = extractBirthday(contact);
 
   if (!name) {
@@ -116,7 +116,7 @@ function prepareContact(contact: GoogleContact): PreparedContact {
       email,
       birthdayDate,
       importable: false,
-      skipReason: "Teléfono no colombiano",
+      skipReason: "Teléfono inválido",
     };
   }
 

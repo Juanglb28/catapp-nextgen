@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import type { ActionResult } from "@/lib/action-result";
-import { normalizePhoneCO } from "@/lib/phone";
+import { normalizePhone } from "@/lib/phone";
 import { swallow } from "@/lib/swallow";
 import {
   fetchGoogleContacts,
@@ -44,7 +44,7 @@ function isDuplicatePhone(error: unknown): boolean {
 /** Entrada mínima para importar un contacto de Google. */
 export type ContactImportInput = {
   name: string;
-  /** Teléfono ya normalizado a E.164 (+57XXXXXXXXXX). */
+  /** Teléfono ya normalizado a E.164 (+57XXXXXXXXXX, o de otro país). */
   phone: string;
   email: string;
   /** Fecha de cumpleaños "YYYY-MM-DD" extraída de Google Contacts (opcional). */
@@ -61,8 +61,8 @@ function toClientInput(data: {
 }): ClientInput {
   return {
     name: data.name,
-    // El schema ya garantizó que normalizePhoneCO no es null.
-    phone: normalizePhoneCO(data.phone)!,
+    // El schema ya garantizó que normalizePhone no es null.
+    phone: normalizePhone(data.phone)!,
     email: data.email === "" ? null : data.email,
     notes: data.notes === "" ? null : data.notes,
     birthdayDate: data.birthdayDate === "" ? null : data.birthdayDate,
@@ -148,7 +148,11 @@ export async function updateClientAction(
       }
     } catch (err) {
       // No bloquear la actualización por un fallo de Google Calendar.
-      swallow(err, { module: "clients", op: "updateClient.gcalBirthday", tenantId });
+      swallow(err, {
+        module: "clients",
+        op: "updateClient.gcalBirthday",
+        tenantId,
+      });
     }
   }
 
@@ -242,7 +246,11 @@ export async function importContactsAction(
           await sendBirthdayPushToTenant(tenantId, client.id);
         } catch (err) {
           // No bloquear importación por fallo de bono.
-          swallow(err, { module: "clients", op: "import.birthdayBonus", tenantId });
+          swallow(err, {
+            module: "clients",
+            op: "import.birthdayBonus",
+            tenantId,
+          });
         }
       }
     } catch (e) {
@@ -305,7 +313,7 @@ export async function syncBirthdaysFromContactsAction(): Promise<
     // Extraer teléfono normalizado a E.164.
     const rawPhone = contact.phoneNumbers?.[0]?.value?.trim() ?? null;
     if (!rawPhone) continue;
-    const phone = normalizePhoneCO(rawPhone);
+    const phone = normalizePhone(rawPhone);
     if (!phone) continue;
 
     // Extraer cumpleaños en formato "YYYY-MM-DD".
@@ -328,7 +336,11 @@ export async function syncBirthdaysFromContactsAction(): Promise<
         bonusFiredToday++;
       } catch (err) {
         // No bloquear sync por fallo de bono.
-        swallow(err, { module: "clients", op: "syncBirthdays.bonus", tenantId });
+        swallow(err, {
+          module: "clients",
+          op: "syncBirthdays.bonus",
+          tenantId,
+        });
       }
     }
   }

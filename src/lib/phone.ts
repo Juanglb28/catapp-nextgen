@@ -1,6 +1,8 @@
 /**
- * Teléfonos de Colombia. Los celulares CO son 10 dígitos que empiezan por 3.
- * Guardamos siempre en formato E.164 (+57XXXXXXXXXX).
+ * Teléfonos. El caso principal es Colombia: los celulares CO son 10 dígitos
+ * que empiezan por 3. Guardamos siempre en formato E.164 (+57XXXXXXXXXX).
+ * Para clientas con teléfono de otro país (p. ej. +1 de EE.UU.), `normalizePhone`
+ * acepta cualquier E.164 internacional válido — ver esa función más abajo.
  */
 
 /**
@@ -17,6 +19,31 @@ export function normalizePhoneCO(input: string): string | null {
     return `+57${local}`;
   }
   return null;
+}
+
+/**
+ * Normaliza cualquier teléfono a E.164. Prioriza el formato de celular
+ * colombiano (`normalizePhoneCO`, sin necesidad de "+"). Si no es
+ * colombiano, acepta un E.164 internacional explícito: debe empezar por
+ * "+" seguido del indicativo de país y el número (8 a 15 dígitos en total,
+ * el máximo permitido por el estándar E.164). Devuelve null si no es válido.
+ *
+ * Usar esta función (no `normalizePhoneCO`) en todo lo que reciba teléfonos
+ * de fuentes externas (Google Contacts) o de clientas que puedan no ser
+ * colombianas; `normalizePhoneCO` queda para el caso puntual en que solo
+ * interesa validar/forzar el formato colombiano.
+ */
+export function normalizePhone(input: string): string | null {
+  const co = normalizePhoneCO(input);
+  if (co) return co;
+
+  const trimmed = input.trim();
+  if (!trimmed.startsWith("+")) return null;
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length < 8 || digits.length > 15) return null;
+
+  return `+${digits}`;
 }
 
 /** Formato legible "+57 300 123 4567" a partir de un E.164 colombiano. */

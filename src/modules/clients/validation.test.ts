@@ -29,6 +29,13 @@ describe("clientFormSchema", () => {
     },
   );
 
+  it.each(["+1 202 555 0123", "+1 (202) 555-0123", "+34 612 345 678"])(
+    "acepta un celular internacional %s",
+    (phone) => {
+      expect(clientFormSchema.safeParse({ ...base, phone }).success).toBe(true);
+    },
+  );
+
   it("exige nombre de al menos 2 caracteres", () => {
     const r = clientFormSchema.safeParse({ ...base, name: "A" });
     expect(r.success).toBe(false);

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { normalizePhoneCO } from "@/lib/phone";
+import { normalizePhone } from "@/lib/phone";
 
 /**
  * Validación del formulario de clienta. Todos los campos son strings (lo que
@@ -13,8 +13,9 @@ export const clientFormSchema = z.object({
     .trim()
     .min(2, { message: "Ingresa el nombre de la clienta" })
     .max(120, { message: "El nombre es demasiado largo" }),
-  phone: z.string().refine((v) => normalizePhoneCO(v) !== null, {
-    message: "Ingresa un celular colombiano válido (+57 3XX XXX XXXX)",
+  phone: z.string().refine((v) => normalizePhone(v) !== null, {
+    message:
+      "Ingresa un celular colombiano válido (+57 3XX XXX XXXX) o un número internacional (+ indicativo de país)",
   }),
   email: z
     .string()

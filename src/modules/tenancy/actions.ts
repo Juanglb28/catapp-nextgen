@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import type { ActionResult } from "@/lib/action-result";
-import { normalizePhoneCO } from "@/lib/phone";
+import { normalizePhone } from "@/lib/phone";
 import { swallow } from "@/lib/swallow";
 import { auth } from "@/lib/auth";
 import { requireTenant } from "@/modules/tenancy/context";
@@ -86,9 +86,9 @@ export async function createTenant(input: unknown): Promise<ActionResult> {
     return { ok: true };
   }
 
-  const phone = normalizePhoneCO(parsed.data.phone);
+  const phone = normalizePhone(parsed.data.phone);
   if (!phone) {
-    return { ok: false, error: "Ingresa un celular colombiano válido." };
+    return { ok: false, error: "Ingresa un celular válido." };
   }
 
   const { tenantId } = await createTenantWithOwner(session.user.id, {
@@ -104,7 +104,11 @@ export async function createTenant(input: unknown): Promise<ActionResult> {
       await createServices(tenantId, SAMPLE_SERVICES);
     } catch (err) {
       // No bloquea el onboarding: los servicios de ejemplo son opcionales.
-      swallow(err, { module: "tenancy", op: "onboarding.seedServices", tenantId });
+      swallow(err, {
+        module: "tenancy",
+        op: "onboarding.seedServices",
+        tenantId,
+      });
     }
   }
 
