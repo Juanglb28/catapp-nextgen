@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import type { ActionResult } from "@/lib/action-result";
-import { formatTime, tenantDayKey, tenantLocalToUtc } from "@/lib/dates";
+import { formatTime, tenantLocalToUtc } from "@/lib/dates";
 import { formatCOP } from "@/lib/money";
 import { syncAppointment } from "@/modules/calendar/sync";
 import { maybeSendAppointmentConfirmation } from "@/modules/whatsapp/auto-send";
@@ -397,10 +397,11 @@ export async function updatePaymentMethodAction(
 
 /**
  * Aplica el bono de cumpleaños elegido por la clienta como descuento de la cita.
- * B2.2: (1) el año del bono se resuelve en la TZ del tenant; (2) solo puede
- * aplicarse durante el MES de cumpleaños de la clienta (promesa "redimible en el
- * mes de tu cumpleaños"); (3) el descuento y la redención ocurren en UNA sola
- * transacción (todo-o-nada), sin dejar descuento aplicado con el bono sin consumir.
+ * B2.2: (1) el año del bono se resuelve en la TZ del tenant; (2) el descuento y
+ * la redención ocurren en UNA sola transacción (todo-o-nada), sin dejar descuento
+ * aplicado con el bono sin consumir. El bono YA NO caduca al mes de cumpleaños:
+ * D-23 revierte esa restricción de B2.2 a pedido de Juan — puede otorgarse/
+ * aplicarse en cualquier momento del año mientras siga en estado 'chosen'.
  */
 export async function applyBirthdayBonusAction(
   id: string,
@@ -421,17 +422,6 @@ export async function applyBirthdayBonusAction(
   );
   if (!bonus || bonus.status !== "chosen" || !bonus.chosenOptionId) {
     return { ok: false, error: "La clienta no tiene un bono elegido." };
-  }
-
-  // Caducidad (B2.2): solo redimible durante el mes de cumpleaños (TZ del tenant).
-  const client = await getClient(tenantId, appointment.clientId);
-  const birthdayMonth = client?.birthdayDate?.slice(5, 7);
-  const currentMonth = tenantDayKey(new Date(), tz).slice(5, 7);
-  if (birthdayMonth && birthdayMonth !== currentMonth) {
-    return {
-      ok: false,
-      error: "El bono solo puede aplicarse durante el mes de cumpleaños.",
-    };
   }
 
   // El descuento sale de la opción elegida (D-19, B1.1), no de columnas fijas.

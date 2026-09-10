@@ -82,6 +82,16 @@
 
 **Verificación (sandbox aislado):** typecheck 0 errores, ESLint limpio en los archivos tocados, 155 tests unitarios verdes, `drizzle-kit check` OK. **Pendiente en tu máquina:** `pnpm db:migrate` (aplica 0023 y corre el backfill) + `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
 
+### 🔓 Fix — Bono de cumpleaños ya no caduca al mes de cumpleaños (2026-09-09, D-23)
+
+**Petición de Juan:** al intentar otorgar/aplicar el bono a una clienta cuyo cumpleaños ya pasó este año, la app lo bloqueaba. Pidió que el bono se pueda otorgar en cualquier momento, sin importar si la fecha de cumpleaños es anterior o posterior a hoy.
+
+**Causa:** no era un bug — era la regla de caducidad de **B2.2** (2026-07-20): `applyBirthdayBonusAction` (`appointments/actions.ts`) comparaba el mes de `birthdayDate` de la clienta contra el mes actual (TZ del tenant) y devolvía error `"El bono solo puede aplicarse durante el mes de cumpleaños."` si no coincidían.
+
+**Cambio (D-23, revierte la caducidad de B2.2, confirmado por Juan):** se elimina ese chequeo de mes en `applyBirthdayBonusAction`. El bono sigue exigiendo estado `chosen` (`getActiveBonusForClient`) y sigue resolviéndose por `year` en la TZ del tenant (sin cambios ahí); simplemente ya no importa en qué mes del año se otorgue/redima. Se quitó también el import ahora sin uso de `tenantDayKey` en ese archivo. Sin migración de DB. Ver `docs/DECISIONES.md` D-23.
+
+**Pendiente de verificar en tu máquina:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build` (no se pudieron correr en este chat — ver notas de entorno en `catapp-handoff.md`).
+
 ### Sistema de bonos de cumpleaños — detalle
 
 - **DB**: columna `birthday_date` (date) en `clients`; columna `birthday_gcal_event_id` (text); tabla `birthday_bonuses` (enum status, public_token); tabla `push_subscriptions`. Migraciones 0016–0018.
