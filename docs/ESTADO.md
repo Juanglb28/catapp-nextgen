@@ -100,7 +100,17 @@
 
 **Cambio (D-24, corrige la regla de D-16, confirmado por Juan):** la vista pública ahora se cierra solo cuando la cita **ya sucedió y quedó pagada** (`status === "completed" && paymentStatus === "paid"`), o cuando está `cancelled`. El comprobante de pago (`receiptData` en `citas/[id]/page.tsx`) no cambia — sigue disponible con solo `paid` o `cancelled`, independiente de si la vista pública sigue abierta; se corrigió el comentario que asumía lo contrario. Sin cambios en `.ics` (`evento.ics/route.ts`), que ya solo miraba `cancelled`. Sin migración de DB.
 
-**Pendiente de verificar en tu máquina:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+**Verificado en la máquina de Juan (2026-09-12):** `pnpm lint`, `pnpm typecheck`, `pnpm test` (303/303 con `TEST_DATABASE_URL`) y `pnpm build`, todos limpios.
+
+### 🔒 Fix — Se desactiva el rate limiting incorporado de Better Auth (2026-09-12, D-25)
+
+**Detectado por Juan revisando Deploy Logs de Railway (prod, `catapp.beauty`):** `WARN [Better Auth]: Rate limiting could not determine a client IP and is falling back to a single shared per-path bucket.`
+
+**Causa:** `src/lib/auth.ts` no configuraba `advanced.ipAddress` en el `betterAuth({...})`. Detrás del proxy de Railway, el rate limiter INCORPORADO de Better Auth (distinto del propio de esta app) no puede leer la IP real del cliente y agrupa a **todas** las usuarias de una misma ruta en un solo balde de límite compartido — riesgo real de bloquear usuarias legítimas si el tráfico total a una ruta sube (incluye bots/escáners, ver también los 404 masivos en Network Logs probando rutas de secretos tipo `.env`/`credentials.json`, ruido normal de internet sin relación con esto).
+
+**Cambio (D-25, confirmado por Juan):** `rateLimit: { enabled: false }` en la config de `betterAuth`. No se reconfiguró `advanced.ipAddress` porque `trustedProxies` de Better Auth necesita IPs/CIDR exactas del proxy (Railway no las publica de forma fija) y esta app ya tiene su propio rate limiter durable en Postgres, consciente de `TRUSTED_PROXY_HOPS` (B3.3/D-22, `getClientIp` + `consumeRateLimit`), cubriendo login/registro/reset, reenvío de verificación, app-lock y cita pública — el de Better Auth quedaba redundante y peor configurado. Sin migración de DB.
+
+**Pendiente de verificar en tu máquina:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, y confirmar en el próximo deploy a Railway que el warning ya no aparece en Deploy Logs.
 
 ### Sistema de bonos de cumpleaños — detalle
 

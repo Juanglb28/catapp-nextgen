@@ -36,6 +36,17 @@ const emailVerificationEnabled = Boolean(resend);
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   secret: process.env.BETTER_AUTH_SECRET,
+  // Rate limiting INCORPORADO de Better Auth: desactivado (D-25). Sin
+  // `advanced.ipAddress` configurado, detrás del proxy de Railway no puede
+  // distinguir IPs y cae a "un solo balde compartido por ruta" para TODOS los
+  // usuarios (visto en prod: "Rate limiting could not determine a client IP").
+  // Eso arriesga bloquear usuarias legítimas si el tráfico total a una ruta
+  // sube (incluye bots). El rate-limit real de esta app es el propio, durable
+  // en Postgres y consciente de `TRUSTED_PROXY_HOPS` (B3.3/D-22, `getClientIp`
+  // + `consumeRateLimit`), que ya cubre login/registro/reset, reenvío de
+  // verificación, app-lock y cita pública — este queda redundante y peor
+  // configurado, así que se apaga en vez de duplicar esa lógica aquí.
+  rateLimit: { enabled: false },
   // En dev se accede desde localhost Y desde la IP de red (para pruebas en móvil).
   // Ambos orígenes deben ser confiados; de lo contrario Better Auth devuelve 403.
   trustedOrigins: [
