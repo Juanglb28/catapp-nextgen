@@ -55,7 +55,7 @@ Si quieres abrir la app desde el móvil por la IP de red (p. ej.
   (lista separada por comas, **sin espacios** tras la coma).
 - Abre el correo en un dispositivo en la **misma WiFi**.
 - La IP de DHCP puede cambiar entre sesiones; si el login falla con `Invalid
-  origin` o un enlace no carga, actualiza ambas variables con la IP actual y
+origin` o un enlace no carga, actualiza ambas variables con la IP actual y
   reinicia `pnpm dev`.
 
 ### Integraciones opcionales
@@ -76,7 +76,7 @@ Sin estas variables, la función queda inerte pero la app arranca:
     remitente de sandbox (`onboarding@resend.dev`), que **solo entrega al
     dueño de la cuenta de Resend** — si registras con cualquier otro correo,
     Resend no lo entrega, aunque la llamada a la API "se vea bien" en el log
-    de la app (ese log es lo que se *intentó* enviar, no una confirmación de
+    de la app (ese log es lo que se _intentó_ enviar, no una confirmación de
     entrega). Fix: si ya verificaste un dominio propio en Resend (pestaña
     **Domains**), pon en tu `.env` un remitente de ese dominio, p. ej.
     `RESEND_FROM_EMAIL="CatApp <no-reply@tudominio>"`, y **reinicia
@@ -110,15 +110,21 @@ true }`.
 
 ## 4. Comandos útiles
 
-| Comando              | Qué hace                                  |
-| -------------------- | ----------------------------------------- |
-| `pnpm dev`           | Servidor de desarrollo                    |
-| `pnpm db:studio`     | Explorador visual de la base (tablas)     |
-| `pnpm lint`          | ESLint (incluye `import/no-cycle`)        |
-| `pnpm typecheck`     | `tsc --noEmit`                            |
-| `pnpm test`          | Vitest (unit; integración se salta sin DB de test) |
-| `pnpm test:unit`     | Solo tests unitarios (rápido)             |
+| Comando                 | Qué hace                                                                |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `pnpm dev`              | Servidor de desarrollo                                                  |
+| `pnpm db:studio`        | Explorador visual de la base (tablas)                                   |
+| `pnpm lint`             | ESLint (incluye `import/no-cycle`)                                      |
+| `pnpm typecheck`        | `tsc --noEmit`                                                          |
+| `pnpm test`             | Vitest (unit; integración se salta sin DB de test)                      |
+| `pnpm test:unit`        | Solo tests unitarios (rápido)                                           |
 | `pnpm test:integration` | Tests de integración (requiere `TEST_DATABASE_URL` a una DB desechable) |
+
+`vitest.setup.ts` carga `.env` automáticamente (`dotenv/config`), así que basta con
+tener `TEST_DATABASE_URL=postgresql://catapp:catapp@127.0.0.1:5433/catapp_test`
+en tu `.env` (base **desechable**, distinta de tu DB de desarrollo) para que
+`pnpm test` corra también los tests de integración — no hace falta exportar la
+variable a mano en cada sesión de terminal.
 
 ## 5. Problemas comunes
 
@@ -131,7 +137,7 @@ true }`.
   apunta a una IP de red inalcanzable. En modo localhost, abre el enlace en tu
   PC cambiando el host por `localhost`.
 - **No llega el correo de reset y el terminal dice `Reset Password: User not
-  found`**: el email no coincide con ninguna cuenta (o la cuenta es solo de
+found`**: el email no coincide con ninguna cuenta (o la cuenta es solo de
   Google, sin contraseña que restablecer). Revisa la tabla `user` con
   `pnpm db:studio`.
 - **Aviso `Cross origin request detected ... /_next/*`**: solo si entras por IP.

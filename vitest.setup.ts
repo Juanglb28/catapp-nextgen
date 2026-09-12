@@ -1,3 +1,24 @@
+// A diferencia de Next.js (que carga TODO `.env` al arrancar `dev`/`build`),
+// Vitest no lee `.env` por su cuenta: sin esto, `TEST_DATABASE_URL` en `.env`
+// se ignora y los tests de integración se saltan aunque la variable esté ahí.
+// OJO: cargamos SOLO `TEST_DATABASE_URL`, nunca el resto de `.env` (`dotenv/
+// config` a secas SÍ lo haría) — otros tests asumen secretos como
+// `GOOGLE_TOKEN_KEY` o `RESEND_API_KEY` indefinidos (para probar el camino
+// "sin configurar"); cargarlos de verdad cambia el comportamiento de la app a
+// mitad del test (p. ej. activa la verificación de email real de D-03/D-22) y
+// rompe esos tests sin que sea un bug de la app.
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { parse } from "dotenv";
+
+if (!process.env.TEST_DATABASE_URL) {
+  const envPath = resolve(process.cwd(), ".env");
+  if (existsSync(envPath)) {
+    const testDbUrl = parse(readFileSync(envPath)).TEST_DATABASE_URL;
+    if (testDbUrl) process.env.TEST_DATABASE_URL = testDbUrl;
+  }
+}
+
 // Antes de CUALQUIER import de módulos de la app: si hay una base de test,
 // apunta DATABASE_URL a ella. Algunos archivos de integración importan `@/lib/db`
 // de forma estática (al cargar), antes de que el arnés fije DATABASE_URL; sin

@@ -9,14 +9,15 @@ import { randomUUID } from "node:crypto";
  *
  * Para correrlos en local usa una base DESECHABLE (el harness hace TRUNCATE
  * CASCADE entre tests: NUNCA apuntes TEST_DATABASE_URL a tu base de desarrollo).
- * Y córrelos EN SERIE con `pnpm test:integration` (--no-file-parallelism): todos
- * los archivos comparten la misma base y hacen TRUNCATE, así que en paralelo se
- * pisan y dan deadlocks/violaciones de FK. Ejemplo (PowerShell):
+ * Los archivos ya corren EN SERIE (`fileParallelism: false` en `vitest.config.ts`):
+ * todos comparten la misma base y hacen TRUNCATE, así que en paralelo se pisan y
+ * dan deadlocks/violaciones de FK. `vitest.setup.ts` carga `.env` (`dotenv/config`)
+ * antes de este chequeo, así que basta con tenerla en `.env` — no hace falta
+ * exportarla a mano en cada sesión de terminal. La migración corre sola
+ * (`src/test/global-setup.ts`). Ejemplo (una sola vez, PowerShell):
  *   docker exec catapp-db psql -U catapp -c "CREATE DATABASE catapp_test;"
- *   $env:DATABASE_URL="postgresql://catapp:catapp@127.0.0.1:5433/catapp_test"
- *   pnpm db:migrate
- *   $env:TEST_DATABASE_URL="postgresql://catapp:catapp@127.0.0.1:5433/catapp_test"
- *   pnpm test:integration
+ *   # En .env: TEST_DATABASE_URL=postgresql://catapp:catapp@127.0.0.1:5433/catapp_test
+ *   pnpm test
  *
  * El cliente de DB se importa de forma diferida (dynamic import) DESPUÉS de
  * apuntar `DATABASE_URL` al test, igual que el resto de tests de integración;
