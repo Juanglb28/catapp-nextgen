@@ -32,7 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function BonusCard({ bonus, waHref }: BonusCardProps) {
   const [loading, setLoading] = useState<
-    "approve" | "decline" | "waive" | null
+    "approve" | "decline" | "waive" | "delete" | null
   >(null);
   const [done, setDone] = useState(false);
 
@@ -81,6 +81,28 @@ export function BonusCard({ bonus, waHref }: BonusCardProps) {
     toast.success(
       "Bono marcado como no usado — queda como gesto para el negocio.",
     );
+  }
+
+  /**
+   * D-27: eliminar un bono ya 'approved' (enviado a la clienta con su link,
+   * pero ella todavía no eligió ni rechazó). Antes de esto no había forma de
+   * quitarlo en ese estado intermedio. Misma transición a 'declined' que
+   * "No enviar"/"No se usará" (D-26) — sin precondición de estado previo en
+   * `declineBirthdayBonus`, así que no requiere cambios de backend. Si la
+   * clienta ya tiene el link guardado y lo abre después, verá el mensaje
+   * genérico de "tu regalo está siendo preparado" (mismo texto que un bono
+   * 'declined' desde pending_manicurist) — no se le notifica el borrado.
+   */
+  async function handleDeleteApproved() {
+    setLoading("delete");
+    const res = await declineBonusAction(bonus.id);
+    setLoading(null);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    setDone(true);
+    toast.success("Bono eliminado.");
   }
 
   return (
@@ -149,14 +171,25 @@ export function BonusCard({ bonus, waHref }: BonusCardProps) {
         </div>
       ) : null}
 
-      {/* Enviar WhatsApp (cuando ya está aprobado) */}
+      {/* Enviar WhatsApp + eliminar (cuando ya está aprobado, D-27) */}
       {bonus.status === "approved" ? (
-        <Button asChild size="sm" className="w-full" variant="outline">
-          <a href={waHref} target="_blank" rel="noopener noreferrer">
-            <WhatsAppIcon className="size-4" />
-            Enviar mensaje de cumpleaños
-          </a>
-        </Button>
+        <div className="space-y-2">
+          <Button asChild size="sm" className="w-full" variant="outline">
+            <a href={waHref} target="_blank" rel="noopener noreferrer">
+              <WhatsAppIcon className="size-4" />
+              Enviar mensaje de cumpleaños
+            </a>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            disabled={loading !== null}
+            onClick={handleDeleteApproved}
+          >
+            {loading === "delete" ? "Eliminando…" : "✕ Eliminar bono"}
+          </Button>
+        </div>
       ) : null}
 
       {/* No se usará (D-26) — solo cuando ya eligió regalo pero aún no lo

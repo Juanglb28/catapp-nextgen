@@ -127,6 +127,16 @@
 
 **Verificado en la máquina de Juan (2026-09-12):** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, todos en verde.
 
+### 🗑️ Feature — Eliminar un bono ya enviado, antes de que la clienta elija (2026-09-12, D-27)
+
+**Reportado por Juan:** intentó eliminar un bono en estado `approved` (ya enviado a la clienta, ella aún no lo escoge ni lo rechaza) y la app no lo permitía — D-26 solo cubrió el estado `chosen`.
+
+**Cambio:** en `bonus-card.tsx`, nuevo botón "✕ Eliminar bono" debajo de "Enviar mensaje de cumpleaños", visible solo cuando `bonus.status === "approved"`. Llama a `declineBonusAction` (mismo mecanismo de D-26, sin cambios de backend) y oculta la tarjeta localmente con el toast "Bono eliminado.". Confirmado con Juan por `AskUserQuestion`: texto "✕ Eliminar bono" (distinto de "No se usará" de `chosen`, porque aquí es una cancelación antes de que la clienta elija, no un servicio ya elegido que decide no usar).
+
+**Nota de comportamiento:** si la clienta ya guardó el link que se le envió por WhatsApp y lo abre después de eliminado el bono, verá el mensaje genérico "Tu regalo está siendo preparado. Tu manicurista te contactará pronto." — el mismo texto que muestra cualquier bono `declined` (`/cumpleanos/[token]/page.tsx` ya trata `declined` igual que `pending_manicurist`). No se le notifica el borrado por ningún otro medio. Si en el futuro se quiere un mensaje más preciso para este caso, requeriría distinguir el motivo del `declined` (hoy no se guarda) — no se hizo aquí porque no fue parte de lo pedido.
+
+**Verificado en la máquina de Juan (2026-09-12):** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, todos en verde (test: 303/303, con el contenedor `catapp-db` de Docker corriendo).
+
 ### Sistema de bonos de cumpleaños — detalle
 
 - **DB**: columna `birthday_date` (date) en `clients`; columna `birthday_gcal_event_id` (text); tabla `birthday_bonuses` (enum status, public_token); tabla `push_subscriptions`. Migraciones 0016–0018.
