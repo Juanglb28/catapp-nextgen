@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { ReactNode } from "react";
 
 import { BottomNav } from "@/components/bottom-nav";
@@ -28,10 +29,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
       <header className="bg-background/90 sticky top-0 z-40 flex h-14 items-center justify-between border-b px-4 backdrop-blur">
         <div className="flex items-center gap-1.5">
-          <img
+          <Image
             src="/icons/icon-192.png"
             alt=""
             aria-hidden
+            width={23}
+            height={23}
             className="size-[23px] shrink-0 rounded-[6px]"
           />
           <div>
