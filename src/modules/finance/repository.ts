@@ -209,9 +209,15 @@ export async function byClient(
  * Citas COMPLETADAS con saldo pendiente (de cualquier fecha), de la más antigua
  * a la más reciente. Es la lista de "por cobrar": trabajo hecho sin pagar del
  * todo. No incluye futuras (scheduled) ni canceladas.
+ *
+ * `opts.before` (D-29): si se pasa, solo incluye citas con `starts_at` anterior
+ * a esa fecha/hora. Lo usa la vista "Citas pendientes de cobro" (antigüedad
+ * >= 1 día calendario, TZ del tenant) — el llamador pasa el inicio del día de
+ * hoy en esa TZ.
  */
 export async function pendingPayments(
   tenantId: string,
+  opts?: { before?: Date },
 ): Promise<PendingPayment[]> {
   const rows = await db
     .select({
@@ -231,6 +237,7 @@ export async function pendingPayments(
         eq(appointments.tenantId, tenantId),
         eq(appointments.status, "completed"),
         sql`${appointments.totalCop} - ${appointments.bonusDiscountCop} > ${appointments.paidCop}`,
+        opts?.before ? lt(appointments.startsAt, opts.before) : undefined,
       ),
     )
     .orderBy(asc(appointments.startsAt));
@@ -246,6 +253,30 @@ export async function pendingPayments(
     // Saldo neto: descuenta el bono aplicado (coherente con el WHERE).
     saldo: r.total - r.bonusDiscount - r.paid,
   }));
+}
+
+/**
+ * Cuenta citas pendientes de cobro con antigüedad >= 1 día calendario (D-29):
+ * completadas, con saldo > 0 y `starts_at` anterior a `before` (el llamador
+ * pasa el inicio del día de hoy en la TZ del tenant). Se usa para la alerta /
+ * badge global en la navegación — conteo liviano, sin traer filas.
+ */
+export async function countOverduePayments(
+  tenantId: string,
+  before: Date,
+): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        eq(appointments.status, "completed"),
+        sql`${appointments.totalCop} - ${appointments.bonusDiscountCop} > ${appointments.paidCop}`,
+        lt(appointments.startsAt, before),
+      ),
+    );
+  return row?.count ?? 0;
 }
 
 /** Total facturado por día del mes (citas completadas), en la TZ del tenant. */

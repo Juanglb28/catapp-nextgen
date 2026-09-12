@@ -12,7 +12,8 @@ import {
  * Capa financiera derivada de `appointments` (F6.B1). Dataset sembrado con
  * fronteras de mes en Bogotá, estados mezclados, pagos parciales, anticipos de
  * canceladas y aislamiento A/B; los totales se verifican contra el cálculo a
- * mano. Requiere `TEST_DATABASE_URL`.
+ * mano. También cubre el filtro `before` de "citas pendientes de cobro" (D-29)
+ * reusando el mismo dataset. Requiere `TEST_DATABASE_URL`.
  */
 
 const TZ = "America/Bogota";
@@ -183,6 +184,36 @@ describe.runIf(TEST_DB)("finanzas (integración)", () => {
     // Junio (saldo 6000), 15 jul (15000), 31 jul (10000). Excluye futura y cancelada.
     expect(rows.map((r) => r.saldo)).toEqual([6000n, 15000n, 10000n]);
     expect(rows[0].startsAt.getTime()).toBeLessThan(rows[1].startsAt.getTime());
+  });
+
+  it("pendingPayments con `before` (D-29) solo incluye antigüedad previa al corte", async () => {
+    const fin = await import("./repository");
+    // Corte entre la del 15 jul (saldo 15000) y la del 31 jul/1 ago (saldo 10000):
+    // deben quedar solo junio (6000) y 15 jul (15000).
+    const cutoff = new Date("2026-07-20T00:00:00Z");
+    const overdue = await fin.pendingPayments(tenantA, { before: cutoff });
+    expect(overdue.map((p) => p.saldo)).toEqual([6000n, 15000n]);
+    expect(overdue.every((p) => p.startsAt.getTime() < cutoff.getTime())).toBe(
+      true,
+    );
+
+    // Sin `opts`, sigue trayendo las 3 (retrocompatible con Finanzas).
+    const all = await fin.pendingPayments(tenantA);
+    expect(all).toHaveLength(3);
+  });
+
+  it("countOverduePayments (D-29) cuenta lo mismo que pendingPayments con `before`, sin traer filas", async () => {
+    const fin = await import("./repository");
+    const cutoff = new Date("2026-07-20T00:00:00Z");
+    const count = await fin.countOverduePayments(tenantA, cutoff);
+    expect(count).toBe(2);
+
+    // Con un corte muy lejano, cuenta las 3 pendientes (agendada y cancelada NO
+    // se cuentan aunque su fecha sea anterior al corte).
+    const far = new Date("2030-01-01T00:00:00Z");
+    const countFar = await fin.countOverduePayments(tenantA, far);
+    const all = await fin.pendingPayments(tenantA);
+    expect(countFar).toBe(all.length);
   });
 
   it("aislamiento A/B: las cifras de B no aparecen en A", async () => {

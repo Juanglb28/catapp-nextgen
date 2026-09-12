@@ -164,6 +164,19 @@ Sin esto, `pnpm test` falla con `column "declined_from_status" of relation "birt
 
 **Verificado en la máquina de Juan (2026-09-12):** migración 0029 aplicada en ambas bases (desarrollo y `catapp_test`), `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, todos en verde.
 
+### 💰 Feature — "Citas pendientes de cobro" + alerta global (2026-09-12, D-29)
+
+**Pedido por Juan:** un componente para ver las citas por cobrar con antigüedad >= 1 día (transcurrido el primer día sin cobrarse), insertado como tab a la derecha de "Proximas" en `/citas`, más una alerta en la app que al tocarla lleve directo a esa vista. Confirmado por `AskUserQuestion`: nombre de la tab "Pendientes" y "antigüedad" = cambio de día calendario en la TZ del negocio (no 24h exactas).
+
+**Cambio:**
+
+- `src/modules/finance/repository.ts`: `pendingPayments(tenantId, opts?: { before?: Date })` — nuevo parámetro opcional, retrocompatible (sin `opts` sigue trayendo todas las fechas, como usa Finanzas). Nueva función `countOverduePayments(tenantId, before)`: conteo liviano (sin traer filas) de citas completadas con saldo pendiente y `starts_at < before`.
+- `src/app/(app)/citas/page.tsx`: 4ta tab "Pendientes" (grid pasa de 3 a 4 columnas), con badge rojo si `overdueCount > 0`. Nueva vista `PendientesView` (misma UI de "Pagos pendientes" de Finanzas: nombre, fecha, saldo, botón WhatsApp con la plantilla `payment_reminder`), bajo el título "Citas pendientes de cobro". El corte (`before`) es el inicio del día de hoy en la TZ del tenant — por eso una cita de hoy con saldo pendiente NO aparece aquí (sigue apareciendo en "Pagos pendientes" de Finanzas, que no filtra por antigüedad).
+- `src/components/bottom-nav.tsx` + `src/app/(app)/layout.tsx`: mismo patrón del badge rosa de cumpleaños, ahora también en el ícono "Citas" (badge rojo). Además, mientras `overdueCount > 0`, el link de ese ícono apunta a `/citas?view=pendientes` en vez de la agenda del día — así "la alerta al tocar conduce al componente de citas por cobrar" sin necesitar un componente de alerta aparte.
+- Tests nuevos: `src/modules/finance/finance.integration.test.ts` (primer archivo de tests para este módulo) — cubre la frontera exacta del día calendario (una cita del día anterior al corte cuenta, una del mismo día del corte no), que las pagadas no cuentan, y que `scheduled`/`cancelled` no cuentan.
+
+**Verificado:** pendiente que Juan corra `pnpm lint && pnpm typecheck && pnpm test && pnpm build` en su máquina.
+
 ### Sistema de bonos de cumpleaños — detalle
 
 - **DB**: columna `birthday_date` (date) en `clients`; columna `birthday_gcal_event_id` (text); tabla `birthday_bonuses` (enum status, public_token); tabla `push_subscriptions`. Migraciones 0016–0018.

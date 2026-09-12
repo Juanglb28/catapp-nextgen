@@ -5,16 +5,23 @@ import { BottomNav } from "@/components/bottom-nav";
 import { OfflineBanner } from "@/components/offline-banner";
 import { PushManager } from "@/components/push-manager";
 import { SwUpdater } from "@/components/sw-updater";
+import { tenantDayKey, tenantDayRangeUtc } from "@/lib/dates";
 import { pendingBirthdayBonusCount } from "@/modules/birthdays/repository";
+import { countOverduePayments } from "@/modules/finance/repository";
 import { getTenantCached, requireTenant } from "@/modules/tenancy/context";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   // Exige sesión + negocio: sin sesión -> /login, sin negocio -> /onboarding.
   const { tenantId } = await requireTenant();
-  // Paralelizado (B0.3): tenant y conteo de cumpleaños son independientes.
-  const [tenant, birthdayCount] = await Promise.all([
-    getTenantCached(tenantId),
+  // El tenant (para la TZ) se necesita antes de calcular el inicio del día de
+  // hoy; los dos conteos de badges sí son independientes entre sí (B0.3),
+  // así que se paralelizan (D-29: se suma el de citas por cobrar).
+  const tenant = await getTenantCached(tenantId);
+  const tz = tenant?.timezone ?? "America/Bogota";
+  const todayStart = tenantDayRangeUtc(tenantDayKey(new Date(), tz), tz).start;
+  const [birthdayCount, overdueCount] = await Promise.all([
     pendingBirthdayBonusCount(tenantId),
+    countOverduePayments(tenantId, todayStart),
   ]);
 
   const name = tenant?.name ?? "CatApp";
@@ -58,7 +65,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
       <main className="flex-1 px-4 pt-5 pb-24">{children}</main>
 
-      <BottomNav birthdayCount={birthdayCount} />
+      <BottomNav birthdayCount={birthdayCount} overdueCount={overdueCount} />
       <SwUpdater />
       <PushManager />
     </div>

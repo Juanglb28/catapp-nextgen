@@ -27,7 +27,13 @@ const items: NavItem[] = [
   { href: "/ajustes", label: "Ajustes", icon: Settings },
 ];
 
-export function BottomNav({ birthdayCount = 0 }: { birthdayCount?: number }) {
+export function BottomNav({
+  birthdayCount = 0,
+  overdueCount = 0,
+}: {
+  birthdayCount?: number;
+  overdueCount?: number;
+}) {
   const pathname = usePathname();
 
   return (
@@ -38,10 +44,16 @@ export function BottomNav({ birthdayCount = 0 }: { birthdayCount?: number }) {
       <ul className="flex">
         {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
+          // Citas por cobrar (D-29): si hay alguna vencida, el ícono navega
+          // directo a la vista "Pendientes" en vez de la agenda del día.
+          const linkHref =
+            href === "/citas" && overdueCount > 0
+              ? "/citas?view=pendientes"
+              : href;
           return (
             <li key={href} className="flex-1">
               <Link
-                href={href}
+                href={linkHref}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2 text-xs font-medium transition-colors",
@@ -63,6 +75,14 @@ export function BottomNav({ birthdayCount = 0 }: { birthdayCount?: number }) {
                       className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-pink-500 px-1 text-[9px] font-bold text-white"
                     >
                       {birthdayCount > 9 ? "9+" : birthdayCount}
+                    </span>
+                  ) : null}
+                  {href === "/citas" && overdueCount > 0 ? (
+                    <span
+                      aria-label={`${overdueCount} cita${overdueCount !== 1 ? "s" : ""} pendiente${overdueCount !== 1 ? "s" : ""} de cobro`}
+                      className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white"
+                    >
+                      {overdueCount > 9 ? "9+" : overdueCount}
                     </span>
                   ) : null}
                 </span>

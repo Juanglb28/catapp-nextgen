@@ -1,4 +1,11 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  MessageCircle,
+  Plus,
+  Wallet,
+} from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -7,6 +14,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import {
   dayKeyDayNumber,
+  formatDateShort,
   formatDayKeyLong,
   formatDayKeyWeekday,
   formatTime,
@@ -27,6 +35,10 @@ import {
   hasScheduledInRange,
   listAppointmentsForAgenda,
 } from "@/modules/appointments/repository";
+import {
+  countOverduePayments,
+  pendingPayments,
+} from "@/modules/finance/repository";
 import { getTenantCached, requireTenant } from "@/modules/tenancy/context";
 import { getTemplates } from "@/modules/whatsapp/repository";
 import { buildWaLink, renderTemplate } from "@/modules/whatsapp/templates";
@@ -93,7 +105,9 @@ export default async function CitasPage({
       ? "semana"
       : sp.view === "proximas"
         ? "proximas"
-        : "dia";
+        : sp.view === "pendientes"
+          ? "pendientes"
+          : "dia";
   const today = tenantDayKey(new Date(), tz);
   const tomorrow = shiftDayKey(today, 1);
   const selected =
@@ -102,7 +116,13 @@ export default async function CitasPage({
   // Badge en tab "Proximas": ¿hay citas mañana? EXISTS ligero en vez de cargar la
   // agenda completa de mañana solo para un booleano (B0.3).
   const { start: tmrStart, end: tmrEnd } = tenantDayRangeUtc(tomorrow, tz);
-  const hasTomorrow = await hasScheduledInRange(tenantId, tmrStart, tmrEnd);
+  const { start: todayStart } = tenantDayRangeUtc(today, tz);
+  // Badge en tab "Pendientes" (D-29): citas por cobrar con antigüedad >= 1 día
+  // calendario (TZ del tenant). Conteo liviano, en paralelo con el de mañana.
+  const [hasTomorrow, overdueCount] = await Promise.all([
+    hasScheduledInRange(tenantId, tmrStart, tmrEnd),
+    countOverduePayments(tenantId, todayStart),
+  ]);
 
   return (
     <div className="pb-24">
@@ -116,8 +136,8 @@ export default async function CitasPage({
         </Button>
       </div>
 
-      {/* Tabs Dia / Semana / Proximas */}
-      <div className="bg-muted mb-4 grid grid-cols-3 gap-1 rounded-lg p-1">
+      {/* Tabs Dia / Semana / Proximas / Pendientes */}
+      <div className="bg-muted mb-4 grid grid-cols-4 gap-1 rounded-lg p-1">
         <Link
           href={`/citas?date=${selected}`}
           className={cn(
@@ -157,6 +177,25 @@ export default async function CitasPage({
             />
           )}
         </Link>
+        <Link
+          href="/citas?view=pendientes"
+          className={cn(
+            "relative rounded-md py-1.5 text-center text-sm font-medium",
+            view === "pendientes"
+              ? "bg-background shadow-xs"
+              : "text-muted-foreground",
+          )}
+        >
+          Pendientes
+          {overdueCount > 0 && (
+            <span
+              aria-label={`${overdueCount} ${overdueCount === 1 ? "cita pendiente" : "citas pendientes"} de cobro`}
+              className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white"
+            >
+              {overdueCount > 9 ? "9+" : overdueCount}
+            </span>
+          )}
+        </Link>
       </div>
 
       {view === "proximas" ? (
@@ -168,6 +207,8 @@ export default async function CitasPage({
         />
       ) : view === "semana" ? (
         <WeekView tenantId={tenantId} tz={tz} today={today} />
+      ) : view === "pendientes" ? (
+        <PendientesView tenantId={tenantId} tz={tz} todayStart={todayStart} />
       ) : (
         <DayView
           tenantId={tenantId}
@@ -309,7 +350,12 @@ async function DayView({
 
   // Recordatorios wa.me de un toque solo para las citas de mañana (QW-5).
   const reminderLinks = isTomorrow
-    ? await buildReminderLinks(tenantId, tz, dayAppts, formatDayKeyLong(selected))
+    ? await buildReminderLinks(
+        tenantId,
+        tz,
+        dayAppts,
+        formatDayKeyLong(selected),
+      )
     : new Map<string, string>();
 
   return (
@@ -496,5 +542,92 @@ async function WeekView({
         );
       })}
     </div>
+  );
+}
+
+// ─── Vista Pendientes ─────────────────────────────────────────────────────────
+
+/**
+ * Citas pendientes de cobro (D-29): completadas, con saldo > 0 y antigüedad
+ * >= 1 día calendario (cambio de día en la TZ del tenant) — `todayStart` es el
+ * inicio del día de hoy, así que solo entran citas de días anteriores. Reusa
+ * `pendingPayments` (F6.B1) y el mismo patrón de cobranza por WhatsApp de
+ * Finanzas.
+ */
+async function PendientesView({
+  tenantId,
+  tz,
+  todayStart,
+}: {
+  tenantId: string;
+  tz: string;
+  todayStart: Date;
+}) {
+  const pending = await pendingPayments(tenantId, { before: todayStart });
+
+  if (pending.length === 0) {
+    return (
+      <EmptyState
+        icon={Wallet}
+        title="Sin citas pendientes de cobro"
+        description="No tienes citas completadas de dias anteriores con saldo pendiente."
+      />
+    );
+  }
+
+  const [tenant, templates] = await Promise.all([
+    getTenantCached(tenantId),
+    getTemplates(tenantId),
+  ]);
+  const negocio = tenant?.name ?? "";
+  const total = pending.reduce((s, p) => s + p.saldo, 0n);
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium">Citas pendientes de cobro</h2>
+        <span className="text-destructive text-sm font-semibold">
+          {formatCOP(total)}
+        </span>
+      </div>
+      <ul className="divide-y rounded-xl border">
+        {pending.map((p) => (
+          <li
+            key={p.appointmentId}
+            className="hover:bg-accent flex items-center gap-1 pr-2"
+          >
+            <Link
+              href={`/citas/${p.appointmentId}`}
+              className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2.5 text-sm"
+            >
+              <span className="min-w-0 flex-1 truncate">
+                {p.clientName}
+                <span className="text-muted-foreground">
+                  {" "}
+                  ·{formatDateShort(p.startsAt, tz)}
+                </span>
+              </span>
+              <span className="font-medium">{formatCOP(p.saldo)}</span>
+            </Link>
+            <a
+              href={buildWaLink(
+                p.clientPhone,
+                renderTemplate(templates.payment_reminder, {
+                  clienta: p.clientName,
+                  negocio,
+                  saldo: formatCOP(p.saldo),
+                }),
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Cobrar a ${p.clientName} por WhatsApp`}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full text-emerald-600"
+            >
+              <MessageCircle className="size-5" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
