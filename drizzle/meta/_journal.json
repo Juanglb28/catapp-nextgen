@@ -204,6 +204,13 @@
       "when": 1785197353840,
       "tag": "0028_nappy_ultimo",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1789236848309,
+      "tag": "0029_declined_from_status",
+      "breakpoints": true
     }
   ]
 }

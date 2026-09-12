@@ -2,19 +2,24 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { requireTenant } from "@/modules/tenancy/context";
 import { getTenant } from "@/modules/tenancy/repository";
-import { listPendingBonuses } from "@/modules/birthdays/repository";
+import {
+  listDeclinedBonuses,
+  listPendingBonuses,
+} from "@/modules/birthdays/repository";
 import { buildWaLink, renderTemplate } from "@/modules/whatsapp/templates";
 import { getTemplates } from "@/modules/whatsapp/repository";
 import { BonusCard } from "./bonus-card";
+import { DeclinedBonusesSection } from "./declined-bonus-section";
 
 export const metadata: Metadata = { title: "Cumpleaños" };
 
 export default async function CumpleanosPage() {
   const { tenantId } = await requireTenant();
-  const [bonuses, tenant, templates] = await Promise.all([
+  const [bonuses, tenant, templates, declinedBonuses] = await Promise.all([
     listPendingBonuses(tenantId),
     getTenant(tenantId),
     getTemplates(tenantId),
+    listDeclinedBonuses(tenantId),
   ]);
 
   const headersList = await headers();
@@ -74,6 +79,15 @@ export default async function CumpleanosPage() {
         Los bonos se crean automáticamente el día del cumpleaños de cada clienta
         que tenga fecha registrada.
       </p>
+
+      <DeclinedBonusesSection
+        bonuses={declinedBonuses.map((b) => ({
+          id: b.id,
+          clientName: b.clientName,
+          clientPhone: b.clientPhone,
+          declinedFromStatus: b.declinedFromStatus,
+        }))}
+      />
     </div>
   );
 }

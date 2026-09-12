@@ -120,8 +120,10 @@ true }`.
 | `pnpm test:unit`        | Solo tests unitarios (rápido)                                           |
 | `pnpm test:integration` | Tests de integración (requiere `TEST_DATABASE_URL` a una DB desechable) |
 
-`vitest.setup.ts` carga `.env` automáticamente (`dotenv/config`), así que basta con
-tener `TEST_DATABASE_URL=postgresql://catapp:catapp@127.0.0.1:5433/catapp_test`
+`vitest.setup.ts` carga automáticamente SOLO `TEST_DATABASE_URL` desde tu `.env`
+(no el resto de variables — a propósito, ver el comentario en ese archivo), así
+que basta con tener
+`TEST_DATABASE_URL=postgresql://catapp:catapp@127.0.0.1:5433/catapp_test`
 en tu `.env` (base **desechable**, distinta de tu DB de desarrollo) para que
 `pnpm test` corra también los tests de integración — no hace falta exportar la
 variable a mano en cada sesión de terminal.
@@ -152,3 +154,13 @@ found`**: el email no coincide con ninguna cuenta (o la cuenta es solo de
   variable **solo** en la ventana de los tests de integración; corre `pnpm dev`
   y `pnpm db:studio` en terminales **sin** ella. Verifica en Studio → SQL console
   con `select current_database();`, y en la terminal con `echo $env:DATABASE_URL`.
+- **Una migración nueva rompe los tests de integración con `column "..." does
+not exist`** aunque acabas de correr `pnpm db:migrate`: ese comando solo
+  migra la base que apunte `DATABASE_URL` en tu `.env` (desarrollo, `catapp`).
+  `catapp_test` es una base DISTINTA y necesita su propia corrida (D-28):
+  ```powershell
+  $env:DATABASE_URL="postgresql://catapp:catapp@127.0.0.1:5433/catapp_test"; pnpm db:migrate
+  ```
+  Regla general: **toda migración nueva se aplica dos veces** — una a
+  `catapp` (desarrollo) y otra a `catapp_test` (pruebas) — antes de correr
+  `pnpm test`.

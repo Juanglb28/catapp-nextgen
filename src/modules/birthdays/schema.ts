@@ -75,6 +75,14 @@ export const birthdayBonuses = pgTable(
     }),
     /** Snapshot de la etiqueta elegida (para mostrarla aunque la opción cambie/borre). */
     chosenOption: text("chosen_option"),
+    /**
+     * Estado justo ANTES de pasar a 'declined' (D-28). Se llena solo al declinar
+     * (ver `declineBirthdayBonus`); null en cualquier otro estado. Permite
+     * revertir un borrado hecho por error (D-26/D-27) devolviendo el bono a
+     * exactamente el estado en el que estaba, sin adivinar. Se limpia (null) al
+     * revertir.
+     */
+    declinedFromStatus: birthdayBonusStatus("declined_from_status"),
     publicToken: uuid("public_token").notNull().defaultRandom(),
     appointmentId: uuid("appointment_id").references(() => appointments.id, {
       onDelete: "set null",

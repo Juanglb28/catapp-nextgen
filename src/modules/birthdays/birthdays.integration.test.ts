@@ -24,7 +24,10 @@ describe.runIf(TEST_DB)("bono de cumpleaños (integración)", () => {
     const year = new Date().getFullYear();
     const bonus = await bd.upsertBirthdayBonus(tenantA, clientId, year);
     await bd.approveBirthdayBonus(tenantA, bonus.id);
-    await bd.chooseBirthdayOption(bonus.id, { id: optionId, label: "Manicure" });
+    await bd.chooseBirthdayOption(bonus.id, {
+      id: optionId,
+      label: "Manicure",
+    });
     return bonus.id;
   }
 
@@ -150,5 +153,57 @@ describe.runIf(TEST_DB)("bono de cumpleaños (integración)", () => {
       "America/Bogota",
     );
     expect(active?.status).toBe("chosen");
+  });
+
+  // D-28: revertir un borrado hecho por error.
+  it("declinar guarda el estado anterior y revertir lo restaura", async () => {
+    const bd = await import("./repository");
+    const bonusId = await seedChosenBonus();
+
+    const declined = await bd.declineBirthdayBonus(tenantA, bonusId);
+    expect(declined?.status).toBe("declined");
+    expect(declined?.declinedFromStatus).toBe("chosen");
+
+    // Aparece en la lista de recuperables.
+    const listed = await bd.listDeclinedBonuses(tenantA);
+    expect(listed.map((b) => b.id)).toContain(bonusId);
+
+    const reverted = await bd.revertDeclinedBonus(tenantA, bonusId);
+    expect(reverted?.status).toBe("chosen");
+    expect(reverted?.declinedFromStatus).toBeNull();
+
+    // Ya no aparece entre los recuperables una vez revertido.
+    const listedAfter = await bd.listDeclinedBonuses(tenantA);
+    expect(listedAfter.map((b) => b.id)).not.toContain(bonusId);
+  });
+
+  it("revertir un bono que no está 'declined' no hace nada", async () => {
+    const bd = await import("./repository");
+    const bonusId = await seedChosenBonus(); // queda en 'chosen', nunca declinado
+
+    const result = await bd.revertDeclinedBonus(tenantA, bonusId);
+    expect(result).toBeNull();
+
+    const untouched = await bd.getActiveBonusForClient(
+      tenantA,
+      clientId,
+      "America/Bogota",
+    );
+    expect(untouched?.status).toBe("chosen");
+  });
+
+  it("declinar dos veces seguidas conserva el estado anterior original", async () => {
+    const bd = await import("./repository");
+    const bonusId = await seedChosenBonus();
+
+    await bd.declineBirthdayBonus(tenantA, bonusId);
+    // Segundo clic sobre un bono ya 'declined': no debe pisar
+    // `declinedFromStatus` con 'declined'.
+    const declinedAgain = await bd.declineBirthdayBonus(tenantA, bonusId);
+    expect(declinedAgain?.status).toBe("declined");
+    expect(declinedAgain?.declinedFromStatus).toBe("chosen");
+
+    const reverted = await bd.revertDeclinedBonus(tenantA, bonusId);
+    expect(reverted?.status).toBe("chosen");
   });
 });

@@ -14,6 +14,7 @@ import {
   declineBirthdayBonus,
   getBonusByToken,
   listBonusOptions,
+  revertDeclinedBonus,
   updateBonusOption,
 } from "./repository";
 
@@ -35,6 +36,26 @@ export async function declineBonusAction(
   const { tenantId } = await requireTenant();
   const bonus = await declineBirthdayBonus(tenantId, bonusId);
   if (!bonus) return { ok: false, error: "Bono no encontrado." };
+  revalidatePath("/cumpleanos");
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Revierte un borrado hecho por error (D-28): devuelve el bono al estado en
+ * que estaba justo antes de declinarlo (`declineBonusAction`), listo para
+ * reenviar su link si corresponde.
+ */
+export async function revertBonusAction(
+  bonusId: string,
+): Promise<ActionResult> {
+  const { tenantId } = await requireTenant();
+  const bonus = await revertDeclinedBonus(tenantId, bonusId);
+  if (!bonus) {
+    return {
+      ok: false,
+      error: "Bono no encontrado o ya no se puede revertir.",
+    };
+  }
   revalidatePath("/cumpleanos");
   return { ok: true, data: undefined };
 }

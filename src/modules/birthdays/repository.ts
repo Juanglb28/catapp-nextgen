@@ -221,27 +221,134 @@ export async function approveBirthdayBonus(
 }
 
 /**
- * Bono → status 'declined'. Dos usos comparten esta transición (D-26): la
- * manicurista rechaza un bono antes de enviarlo ("No enviar"), o marca uno ya
- * elegido ('chosen') que la clienta decidió no usar, como gesto/propina para
- * no afectar sus ingresos ("No se usará"). Sin precondición de estado previo
- * a propósito, para cubrir ambos casos sin duplicar lógica.
+ * Bono → status 'declined'. Tres usos comparten esta transición: la
+ * manicurista rechaza un bono antes de enviarlo ("No enviar"), elimina uno ya
+ * enviado que la clienta aún no elige ni rechaza (D-27, "Eliminar bono"), o
+ * marca uno ya elegido ('chosen') que la clienta decidió no usar, como
+ * gesto/propina para no afectar sus ingresos (D-26, "No se usará"). Sin
+ * precondición de estado previo a propósito, para cubrir los tres casos sin
+ * duplicar lógica.
+ *
+ * D-28: guarda el estado anterior en `declined_from_status` para poder
+ * revertir un borrado hecho por error. Lee con `FOR UPDATE` DENTRO de la
+ * transacción (mismo patrón que `registerPayment`, B2.1) para que el estado
+ * capturado sea siempre el de justo antes de este cambio, sin condición de
+ * carrera frente a otra escritura concurrente sobre el mismo bono.
  */
 export async function declineBirthdayBonus(
   tenantId: string,
   bonusId: string,
 ): Promise<BirthdayBonus | null> {
-  const [row] = await db
-    .update(birthdayBonuses)
-    .set({ status: "declined", updatedAt: new Date() })
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(birthdayBonuses)
+      .where(
+        and(
+          eq(birthdayBonuses.tenantId, tenantId),
+          eq(birthdayBonuses.id, bonusId),
+        ),
+      )
+      .for("update")
+      .limit(1);
+    if (!current) return null;
+
+    // Si YA estaba 'declined' (doble clic, reintento), conserva el
+    // `declinedFromStatus` que ya tenía en vez de sobrescribirlo con
+    // 'declined' — evita perder el estado original al que se podría revertir.
+    const declinedFromStatus =
+      current.status === "declined"
+        ? current.declinedFromStatus
+        : current.status;
+
+    const [row] = await tx
+      .update(birthdayBonuses)
+      .set({
+        status: "declined",
+        declinedFromStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(birthdayBonuses.id, bonusId))
+      .returning();
+    return row ?? null;
+  });
+}
+
+/**
+ * Bonos eliminados/declinados recientemente (D-28), con estado anterior
+ * conocido (revertibles). Ventana de 30 días para no acumular indefinidamente
+ * bonos viejos que ya nadie va a recuperar.
+ */
+export async function listDeclinedBonuses(
+  tenantId: string,
+): Promise<(BirthdayBonus & { clientName: string; clientPhone: string })[]> {
+  const rows = await db
+    .select({
+      bonus: birthdayBonuses,
+      clientName: clients.name,
+      clientPhone: clients.phone,
+    })
+    .from(birthdayBonuses)
+    .innerJoin(clients, eq(birthdayBonuses.clientId, clients.id))
     .where(
       and(
         eq(birthdayBonuses.tenantId, tenantId),
-        eq(birthdayBonuses.id, bonusId),
+        eq(birthdayBonuses.status, "declined"),
+        sql`${birthdayBonuses.declinedFromStatus} IS NOT NULL`,
+        sql`${birthdayBonuses.updatedAt} >= now() - interval '30 days'`,
       ),
     )
-    .returning();
-  return row ?? null;
+    .orderBy(desc(birthdayBonuses.updatedAt))
+    .limit(20);
+
+  return rows.map((r) => ({
+    ...r.bonus,
+    clientName: r.clientName,
+    clientPhone: r.clientPhone,
+  }));
+}
+
+/**
+ * Revierte un bono 'declined' de vuelta al estado en que estaba justo antes
+ * (D-28) — para deshacer un borrado hecho por error (D-26/D-27). Solo aplica
+ * si sigue 'declined' y tiene un estado anterior conocido; limpia
+ * `declined_from_status` al revertir.
+ */
+export async function revertDeclinedBonus(
+  tenantId: string,
+  bonusId: string,
+): Promise<BirthdayBonus | null> {
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(birthdayBonuses)
+      .where(
+        and(
+          eq(birthdayBonuses.tenantId, tenantId),
+          eq(birthdayBonuses.id, bonusId),
+        ),
+      )
+      .for("update")
+      .limit(1);
+    if (
+      !current ||
+      current.status !== "declined" ||
+      !current.declinedFromStatus
+    ) {
+      return null;
+    }
+
+    const [row] = await tx
+      .update(birthdayBonuses)
+      .set({
+        status: current.declinedFromStatus,
+        declinedFromStatus: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(birthdayBonuses.id, bonusId))
+      .returning();
+    return row ?? null;
+  });
 }
 
 /**

@@ -137,6 +137,33 @@
 
 **Verificado en la máquina de Juan (2026-09-12):** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, todos en verde (test: 303/303, con el contenedor `catapp-db` de Docker corriendo).
 
+### ↩️ Feature — Revertir el borrado de un bono, para reenviar el link (2026-09-12, D-28)
+
+**Pedido por Juan:** poder deshacer el borrado de un bono de cumpleaños que ya se le envió a una clienta, por si se elimina por equivocación — y volver a poder reenviarle el link.
+
+**Por qué hacía falta (no solo comodidad):** `birthday_bonuses` tiene un índice único por clienta+año (`birthday_bonuses_client_year_idx`). Un bono `declined` sigue ocupando esa fila, así que si se borra por error, no hay forma de crear uno nuevo para esa clienta hasta el año siguiente — revertir es la única salida.
+
+**Cambio:**
+
+- **Migración `0029_declined_from_status.sql`** (`pendiente en tu máquina: pnpm db:migrate`): agrega la columna nullable `declined_from_status` a `birthday_bonuses`, reusando el enum `birthday_bonus_status` que ya existía (sin `ALTER TYPE ADD VALUE`, solo `ADD COLUMN` — mismo cuidado de D-18/D-22).
+- `declineBirthdayBonus` (repository.ts) ahora lee el bono con `FOR UPDATE` dentro de una transacción (mismo patrón que `registerPayment`, B2.1) y guarda en `declined_from_status` el estado justo antes de declinar — así sabe exactamente a qué volver, sin adivinar entre `pending_manicurist`/`approved`/`chosen`. Si el bono ya estaba `declined` (doble clic), conserva el valor que ya tenía en vez de sobrescribirlo con `'declined'`.
+- Nuevas funciones `listDeclinedBonuses` (declinados de los últimos 30 días con estado anterior conocido) y `revertDeclinedBonus` (solo actúa si sigue `declined` y tiene `declined_from_status`; limpia la columna al revertir). Nueva acción `revertBonusAction`.
+- En `/cumpleanos`, nueva sección colapsada al final de la página: "🗑️ N bonos eliminados — se puede recuperar" (`declined-bonus-section.tsx`, componente cliente; no se renderiza si no hay nada que revertir). Cada fila muestra el nombre/teléfono de la clienta, a qué estado volverá, y un botón "↩ Revertir".
+- **Reenviar el link no necesitó código nuevo:** al revertir un bono que estaba `approved`, vuelve a aparecer en la lista normal en ese mismo estado, con el botón "Enviar mensaje de cumpleaños" (D-19) ya disponible ahí — el mismo link (`public_token` nunca cambia).
+- Tests nuevos en `birthdays.integration.test.ts`: declinar guarda el estado anterior y revertir lo restaura; revertir algo que no está `declined` no hace nada; declinar dos veces seguidas no pierde el estado original.
+
+**Limitación aceptada:** los bonos declinados ANTES de esta migración (con D-26/D-27, ya usados hoy en producción) quedan con `declined_from_status = null` — no hay forma de saber a qué estado volver, así que no aparecen en la sección de recuperar. Solo los declinados de aquí en adelante son revertibles.
+
+**Nota operativa importante (nueva):** `pnpm db:migrate` solo migra la base que apunte `DATABASE_URL` en `.env` (desarrollo, `catapp`) — la base de pruebas (`catapp_test`) es una base DISTINTA en el mismo Postgres de Docker y necesita su propia corrida:
+
+```powershell
+$env:DATABASE_URL="postgresql://catapp:catapp@127.0.0.1:5433/catapp_test"; pnpm db:migrate
+```
+
+Sin esto, `pnpm test` falla con `column "declined_from_status" of relation "birthday_bonuses" does not exist` aunque la migración ya esté aplicada en desarrollo. Aplica a toda migración futura con tests de integración, no solo a esta.
+
+**Verificado en la máquina de Juan (2026-09-12):** migración 0029 aplicada en ambas bases (desarrollo y `catapp_test`), `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, todos en verde.
+
 ### Sistema de bonos de cumpleaños — detalle
 
 - **DB**: columna `birthday_date` (date) en `clients`; columna `birthday_gcal_event_id` (text); tabla `birthday_bonuses` (enum status, public_token); tabla `push_subscriptions`. Migraciones 0016–0018.
