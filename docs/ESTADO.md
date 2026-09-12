@@ -112,6 +112,21 @@
 
 **Pendiente de verificar en tu máquina:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, y confirmar en el próximo deploy a Railway que el warning ya no aparece en Deploy Logs.
 
+### 🎁 Feature — Marcar un bono elegido como "no se usará" / propina (2026-09-12, D-26)
+
+**Pedido por Juan:** una forma de "borrar" bonos de cumpleaños que las clientas deciden no usar (para no afectar los ingresos de la manicurista) — un gesto, básicamente una propina.
+
+**Diseño confirmado por Juan (`AskUserQuestion`):** (1) solo la manicurista la acciona, desde su panel — no se notifica nada a la clienta; (2) solo aplica a bonos en estado `chosen` (ya eligió regalo, aún no lo redime en una cita) — hoy es el único estado de la tarjeta en `/cumpleanos` sin ninguna acción disponible; (3) reusa el estado `declined` en vez de un valor de enum nuevo o un borrado físico de la fila.
+
+**Cambio:**
+
+- `src/app/(app)/cumpleanos/bonus-card.tsx`: nuevo botón "🎁 No se usará" (texto final ajustado por Juan — "propina" solo daba contexto de negocio, no era el rótulo pedido), visible solo cuando `bonus.status === "chosen"`. Llama a `declineBonusAction` (ya existente, sin cambios) y al terminar oculta la tarjeta localmente con un toast, igual que el flujo de "✕ No enviar".
+- `src/modules/birthdays/repository.ts`: comentario actualizado en `declineBirthdayBonus` documentando que ahora cubre dos casos de negocio (rechazo antes de enviar, y "no se usará" tras elegir) — sin cambios de código: la función ya no exigía un estado previo específico.
+- Sin migración de DB (evita otra vez la limitación de `ALTER TYPE ADD VALUE` en transacción, D-18/D-22). Sin cambios en la cita: un bono `chosen` nunca tiene descuento/cita asociada todavía (eso solo pasa al redimir, que lo mueve directo a `redeemed`), así que declinar uno `chosen` no puede dejar una cita a medias.
+- Sin tests nuevos: no hay lógica de negocio nueva, solo un nuevo punto de entrada en la UI hacia una función ya existente (`declineBirthdayBonus`, sin precondición de estado, ya cubierta implícitamente por los tests de la app).
+
+**Verificado en la máquina de Juan (2026-09-12):** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, todos en verde.
+
 ### Sistema de bonos de cumpleaños — detalle
 
 - **DB**: columna `birthday_date` (date) en `clients`; columna `birthday_gcal_event_id` (text); tabla `birthday_bonuses` (enum status, public_token); tabla `push_subscriptions`. Migraciones 0016–0018.

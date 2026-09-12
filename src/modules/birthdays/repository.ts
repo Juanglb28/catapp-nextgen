@@ -37,7 +37,9 @@ export async function getBonusOption(
   const rows = await db
     .select()
     .from(bonusOptions)
-    .where(and(eq(bonusOptions.tenantId, tenantId), eq(bonusOptions.id, optionId)))
+    .where(
+      and(eq(bonusOptions.tenantId, tenantId), eq(bonusOptions.id, optionId)),
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -61,7 +63,9 @@ export async function updateBonusOption(
   const [row] = await db
     .update(bonusOptions)
     .set(data)
-    .where(and(eq(bonusOptions.tenantId, tenantId), eq(bonusOptions.id, optionId)))
+    .where(
+      and(eq(bonusOptions.tenantId, tenantId), eq(bonusOptions.id, optionId)),
+    )
     .returning();
   return row ?? null;
 }
@@ -216,7 +220,13 @@ export async function approveBirthdayBonus(
   return row ?? null;
 }
 
-/** Manicurista rechaza el bono → status 'declined'. */
+/**
+ * Bono → status 'declined'. Dos usos comparten esta transición (D-26): la
+ * manicurista rechaza un bono antes de enviarlo ("No enviar"), o marca uno ya
+ * elegido ('chosen') que la clienta decidió no usar, como gesto/propina para
+ * no afectar sus ingresos ("No se usará"). Sin precondición de estado previo
+ * a propósito, para cubrir ambos casos sin duplicar lógica.
+ */
 export async function declineBirthdayBonus(
   tenantId: string,
   bonusId: string,

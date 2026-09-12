@@ -31,7 +31,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function BonusCard({ bonus, waHref }: BonusCardProps) {
-  const [loading, setLoading] = useState<"approve" | "decline" | null>(null);
+  const [loading, setLoading] = useState<
+    "approve" | "decline" | "waive" | null
+  >(null);
   const [done, setDone] = useState(false);
 
   if (done) return null;
@@ -57,6 +59,28 @@ export function BonusCard({ bonus, waHref }: BonusCardProps) {
     }
     setDone(true);
     toast.success("Bono rechazado.");
+  }
+
+  /**
+   * D-26: clienta elige no usar el bono ya elegido (gesto para no afectar los
+   * ingresos de la manicurista, "propina"). Reusa `declineBonusAction` — el
+   * mismo estado 'declined' que "No enviar" — para no requerir un valor de
+   * enum nuevo (evita la limitación de Drizzle con transacciones en D-18) y
+   * porque 'declined' ya queda fuera de listPendingBonuses/getActiveBonusForClient.
+   * Solo la manicurista la marca aquí; no se notifica nada a la clienta.
+   */
+  async function handleWaive() {
+    setLoading("waive");
+    const res = await declineBonusAction(bonus.id);
+    setLoading(null);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    setDone(true);
+    toast.success(
+      "Bono marcado como no usado — queda como gesto para el negocio.",
+    );
   }
 
   return (
@@ -132,6 +156,20 @@ export function BonusCard({ bonus, waHref }: BonusCardProps) {
             <WhatsAppIcon className="size-4" />
             Enviar mensaje de cumpleaños
           </a>
+        </Button>
+      ) : null}
+
+      {/* No se usará (D-26) — solo cuando ya eligió regalo pero aún no lo
+          redime en una cita. */}
+      {bonus.status === "chosen" ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full"
+          disabled={loading !== null}
+          onClick={handleWaive}
+        >
+          {loading === "waive" ? "Marcando…" : "🎁 No se usará"}
         </Button>
       ) : null}
     </li>
