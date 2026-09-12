@@ -59,9 +59,19 @@ export default async function PublicCitaPage({
 
   const appt = await getPublicAppointment(token);
 
-  // La vista pública se cierra cuando la cita quedó pagada o cancelada: la
-  // clienta ya conserva el comprobante que le envía la manicurista.
-  if (!appt || appt.status === "cancelled" || appt.paymentStatus === "paid") {
+  // La vista pública se cierra cuando la cita YA SUCEDIÓ y quedó pagada
+  // (completed + paid: la clienta ya conserva el comprobante que le envía la
+  // manicurista), o cuando está cancelada. D-24 corrige la regla original de
+  // D-16 (solo `paymentStatus === "paid"`), que cerraba la página también en
+  // citas agendadas a futuro pagadas por adelantado o con un bono que cubría
+  // el 100% del total (D-23 lo hizo más frecuente) — la clienta perdía el
+  // acceso para confirmar/rechazar la cita, agregarla al calendario o ver la
+  // dirección, antes de que la cita siquiera sucediera.
+  if (
+    !appt ||
+    appt.status === "cancelled" ||
+    (appt.status === "completed" && appt.paymentStatus === "paid")
+  ) {
     return <Unavailable />;
   }
 

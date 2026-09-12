@@ -237,8 +237,10 @@ export default async function CitaDetailPage({
         }
       : undefined;
 
-  // Comprobante: disponible cuando la cita quedó pagada o cancelada (la vista
-  // pública ya no está disponible para la clienta en esos estados).
+  // Comprobante: disponible cuando la cita quedó pagada (aunque sea un abono
+  // por adelantado a una cita aún agendada) o cancelada. No depende de si la
+  // vista pública de la clienta sigue abierta — desde D-24 esa vista solo se
+  // cierra cuando la cita ya sucedió y quedó pagada, o está cancelada.
   const receiptData: ReceiptData | null =
     appointment.paymentStatus === "paid" || appointment.status === "cancelled"
       ? {

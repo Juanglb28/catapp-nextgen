@@ -90,7 +90,17 @@
 
 **Cambio (D-23, revierte la caducidad de B2.2, confirmado por Juan):** se elimina ese chequeo de mes en `applyBirthdayBonusAction`. El bono sigue exigiendo estado `chosen` (`getActiveBonusForClient`) y sigue resolviéndose por `year` en la TZ del tenant (sin cambios ahí); simplemente ya no importa en qué mes del año se otorgue/redima. Se quitó también el import ahora sin uso de `tenantDayKey` en ese archivo. Sin migración de DB. Ver `docs/DECISIONES.md` D-23.
 
-**Pendiente de verificar en tu máquina:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build` (no se pudieron correr en este chat — ver notas de entorno en `catapp-handoff.md`).
+**Verificado en la máquina de Juan (2026-09-10/12):** `pnpm lint` (0 errores, 1 warning preexistente sin relación en `(app)/layout.tsx`), `pnpm typecheck` limpio, `pnpm test` con `TEST_DATABASE_URL` — **303/303 tests** (incluye los 19 archivos de integración, antes gated), `pnpm build` limpio. Gate completo en verde.
+
+### 🔓 Fix — La vista pública de la cita ya no se cierra en citas agendadas a futuro (2026-09-12, D-24)
+
+**Bug reportado por Juan:** en citas ya agendadas (a futuro, sin suceder aún), la pantalla pública (`/cita/[token]`) donde la clienta revisa su cita desaparecía (mostraba "Esta cita ya no está disponible").
+
+**Causa raíz:** `src/app/(public)/cita/[token]/page.tsx` cerraba la vista con `appt.paymentStatus === "paid"` **sin mirar el `status` de la cita**. `derivePaymentStatus` (`appointments/domain.ts`) es puro dinero — no depende de si la cita ya sucedió — así que una cita `scheduled` (a futuro) quedaba con `paymentStatus: "paid"` en dos casos sin haberse prestado el servicio: (1) un abono/pago del 100% por adelantado, o (2) un bono/descuento (D-19) que cubre el total completo (`derivePaymentStatus` devuelve `"paid"` cuando el neto llega a 0) — este segundo caso se volvió más frecuente con D-23, que permite aplicar el bono en cualquier momento. En ambos casos la clienta perdía la página antes de que la cita ocurriera: sin poder confirmar/rechazar, agregar al calendario, ver la dirección ni el enlace de WhatsApp.
+
+**Cambio (D-24, corrige la regla de D-16, confirmado por Juan):** la vista pública ahora se cierra solo cuando la cita **ya sucedió y quedó pagada** (`status === "completed" && paymentStatus === "paid"`), o cuando está `cancelled`. El comprobante de pago (`receiptData` en `citas/[id]/page.tsx`) no cambia — sigue disponible con solo `paid` o `cancelled`, independiente de si la vista pública sigue abierta; se corrigió el comentario que asumía lo contrario. Sin cambios en `.ics` (`evento.ics/route.ts`), que ya solo miraba `cancelled`. Sin migración de DB.
+
+**Pendiente de verificar en tu máquina:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
 
 ### Sistema de bonos de cumpleaños — detalle
 
