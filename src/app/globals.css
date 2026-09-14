@@ -411,3 +411,69 @@
     var(--brand-to) 100%
   );
 }
+
+/* ─── Animación "abrir regalo" (D-30) ──────────────────────────────────────
+   Caja + confeti dibujados a mano (SVG/CSS, sin librerías — mismo criterio
+   de D-15/D-16) para la pantalla pública de elección del bono de
+   cumpleaños. Colores fijos, no usan tokens de --brand/paleta: esa pantalla
+   tiene su propio look morado/rosa oscuro, independiente del tema del
+   negocio. */
+
+@keyframes gift-idle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-2deg);
+  }
+}
+
+@keyframes gift-lid-pop {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  60% {
+    transform: translateY(-26px) rotate(-16deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-34px) rotate(-22deg);
+    opacity: 0;
+  }
+}
+
+@keyframes gift-confetti {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(
+        calc(-50% + var(--gx, 0px)),
+        calc(-50% + var(--gy, 0px))
+      )
+      rotate(var(--grot, 360deg));
+    opacity: 0;
+  }
+}
+
+@keyframes gift-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-gift-idle {
+  animation: gift-idle 2.4s ease-in-out infinite;
+}
+
+@utility animate-gift-fade-in {
+  animation: gift-fade-in 0.45s ease-out both;
+}
