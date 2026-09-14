@@ -14,6 +14,7 @@ import {
   declineBirthdayBonus,
   getBonusByToken,
   listBonusOptions,
+  resetChosenBonus,
   revertDeclinedBonus,
   updateBonusOption,
 } from "./repository";
@@ -54,6 +55,28 @@ export async function revertBonusAction(
     return {
       ok: false,
       error: "Bono no encontrado o ya no se puede revertir.",
+    };
+  }
+  revalidatePath("/cumpleanos");
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Deshace la elección de la clienta para que pueda elegir de nuevo (D-31):
+ * bono 'chosen' → vuelve a 'approved', limpiando la opción elegida. A
+ * diferencia de `declineBonusAction`, el bono sigue vivo (no pasa a
+ * 'declined') — al reabrir el mismo link, la clienta vuelve a ver la
+ * pantalla de elección.
+ */
+export async function resetBonusChoiceAction(
+  bonusId: string,
+): Promise<ActionResult> {
+  const { tenantId } = await requireTenant();
+  const bonus = await resetChosenBonus(tenantId, bonusId);
+  if (!bonus) {
+    return {
+      ok: false,
+      error: "Bono no encontrado o no tiene una elección para deshacer.",
     };
   }
   revalidatePath("/cumpleanos");

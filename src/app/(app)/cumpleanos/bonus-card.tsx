@@ -10,6 +10,7 @@ import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import {
   approveBonusAction,
   declineBonusAction,
+  resetBonusChoiceAction,
 } from "@/modules/birthdays/actions";
 
 type BonusCardProps = {
@@ -32,7 +33,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function BonusCard({ bonus, waHref }: BonusCardProps) {
   const [loading, setLoading] = useState<
-    "approve" | "decline" | "waive" | "delete" | null
+    "approve" | "decline" | "waive" | "delete" | "reset" | null
   >(null);
   const [done, setDone] = useState(false);
 
@@ -59,6 +60,23 @@ export function BonusCard({ bonus, waHref }: BonusCardProps) {
     }
     setDone(true);
     toast.success("Bono rechazado.");
+  }
+
+  /**
+   * D-31: la clienta eligió por equivocación y quiere elegir otra vez. A
+   * diferencia de `handleWaive` (que declina el bono), esto lo deja vivo:
+   * vuelve a 'approved' y limpia la opción elegida, para que al abrir el
+   * mismo link vea otra vez la pantalla de elección.
+   */
+  async function handleReset() {
+    setLoading("reset");
+    const res = await resetBonusChoiceAction(bonus.id);
+    setLoading(null);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("Elección reiniciada — la clienta puede elegir de nuevo.");
   }
 
   /**
@@ -192,18 +210,29 @@ export function BonusCard({ bonus, waHref }: BonusCardProps) {
         </div>
       ) : null}
 
-      {/* No se usará (D-26) — solo cuando ya eligió regalo pero aún no lo
-          redime en una cita. */}
+      {/* Elegir de nuevo (D-31) + No se usará (D-26) — solo cuando ya eligió
+          regalo pero aún no lo redime en una cita. */}
       {bonus.status === "chosen" ? (
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full"
-          disabled={loading !== null}
-          onClick={handleWaive}
-        >
-          {loading === "waive" ? "Marcando…" : "🎁 No se usará"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            disabled={loading !== null}
+            onClick={handleReset}
+          >
+            {loading === "reset" ? "…" : "↩ Elegir de nuevo"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            disabled={loading !== null}
+            onClick={handleWaive}
+          >
+            {loading === "waive" ? "Marcando…" : "🎁 No se usará"}
+          </Button>
+        </div>
       ) : null}
     </li>
   );

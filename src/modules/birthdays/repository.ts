@@ -377,6 +377,37 @@ export async function chooseBirthdayOption(
   return row ?? null;
 }
 
+/**
+ * Deshace la elección de la clienta (D-31): bono 'chosen' → vuelve a
+ * 'approved', limpiando `chosenOptionId`/`chosenOption`. A diferencia de
+ * `declineBirthdayBonus` (que lo saca del flujo hacia 'declined'), el bono
+ * sigue vivo: al volver a `approved`, la clienta ve otra vez la pantalla de
+ * elección en el mismo link. Solo aplica si sigue 'chosen' — no reactiva un
+ * bono ya 'redeemed' (ese ya tiene descuento/cita aplicados).
+ */
+export async function resetChosenBonus(
+  tenantId: string,
+  bonusId: string,
+): Promise<BirthdayBonus | null> {
+  const [row] = await db
+    .update(birthdayBonuses)
+    .set({
+      status: "approved",
+      chosenOptionId: null,
+      chosenOption: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(birthdayBonuses.tenantId, tenantId),
+        eq(birthdayBonuses.id, bonusId),
+        eq(birthdayBonuses.status, "chosen"),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
 /** Bono redimido en una cita → status 'redeemed'. */
 export async function redeemBirthdayBonus(
   tenantId: string,

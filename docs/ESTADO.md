@@ -190,7 +190,20 @@ Sin esto, `pnpm test` falla con `column "declined_from_status" of relation "birt
 - Sin cambios de backend ni de esquema: la elección del regalo sigue siendo la misma acción de siempre: solo cambia lo que la clienta ve antes de llegar a ella.
 - Sin tests nuevos: es una animación puramente visual sobre un componente cliente sin lógica de negocio (la lógica de elegir/confirmar, que sí tiene tests, no cambió).
 
-**Verificado:** pendiente que Juan corra `pnpm lint && pnpm typecheck && pnpm test && pnpm build` en su máquina y confirme visualmente la animación (celular real, y con "reducir movimiento" activado).
+**Verificado en la máquina de Juan (2026-09-14):** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, todos en verde (una corrida con Docker recién arrancado mostró 4 fallos, todos timeouts de arranque de Postgres salvo un `duplicate key` en cascada del mismo cold-start — ninguno relacionado con este cambio; confirmado en verde al repetir la corrida).
+
+### ↩ Feature — Resetear elección de bono de cumpleaños (2026-09-14, D-31)
+
+**Pedido por Juan:** si la clienta elige un regalo por equivocación, poder devolver el bono al estado anterior del flujo para que pueda elegir de nuevo.
+
+**Cambio:**
+
+- `src/modules/birthdays/repository.ts`: nueva función `resetChosenBonus(tenantId, bonusId)` — `chosen → approved`, limpiando `chosenOptionId`/`chosenOption`. Solo actúa si el bono sigue `chosen` (no toca uno ya `redeemed`).
+- `src/modules/birthdays/actions.ts`: nueva `resetBonusChoiceAction(bonusId)`, revalida `/cumpleanos`.
+- `src/app/(app)/cumpleanos/bonus-card.tsx`: nuevo botón "↩ Elegir de nuevo" junto a "🎁 No se usará" (D-26), visible solo en estado `chosen`. Al usarlo, la clienta puede volver a abrir su mismo link (`publicToken` sin cambios) y ver otra vez la pantalla de elección.
+- Tests nuevos en `src/modules/birthdays/birthdays.integration.test.ts`: `chosen → approved` con limpieza de la opción y re-elección exitosa después; no hace nada sobre un bono `approved` (nunca elegido); no reactiva uno ya `redeemed`.
+
+**Verificado:** pendiente que Juan corra `pnpm lint && pnpm typecheck && pnpm test && pnpm build` en su máquina.
 
 ### Sistema de bonos de cumpleaños — detalle
 

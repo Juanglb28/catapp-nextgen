@@ -11,6 +11,7 @@ import {
 /**
  * Ciclo del bono de cumpleaños contra DB real (B2.2): aplicación transaccional
  * (descuento + redención todo-o-nada) y resolución del año en la TZ del tenant.
+ * Incluye revertir un borrado (D-28) y resetear una elección (D-31).
  * Requiere `TEST_DATABASE_URL`.
  */
 describe.runIf(TEST_DB)("bono de cumpleaños (integración)", () => {
@@ -205,5 +206,60 @@ describe.runIf(TEST_DB)("bono de cumpleaños (integración)", () => {
 
     const reverted = await bd.revertDeclinedBonus(tenantA, bonusId);
     expect(reverted?.status).toBe("chosen");
+  });
+
+  // D-31: deshacer una elección hecha por error, sin sacar el bono del flujo.
+  it("resetChosenBonus vuelve 'chosen' a 'approved' y limpia la opción elegida", async () => {
+    const bd = await import("./repository");
+    const bonusId = await seedChosenBonus();
+
+    const reset = await bd.resetChosenBonus(tenantA, bonusId);
+    expect(reset?.status).toBe("approved");
+    expect(reset?.chosenOptionId).toBeNull();
+    expect(reset?.chosenOption).toBeNull();
+
+    // Puede elegir de nuevo por el mismo camino que la primera vez.
+    const chosenAgain = await bd.chooseBirthdayOption(bonusId, {
+      id: optionId,
+      label: "Manicure",
+    });
+    expect(chosenAgain?.status).toBe("chosen");
+  });
+
+  it("resetChosenBonus no hace nada si el bono no está 'chosen'", async () => {
+    const bd = await import("./repository");
+    const year = new Date().getFullYear();
+    const bonus = await bd.upsertBirthdayBonus(tenantA, clientId, year);
+    await bd.approveBirthdayBonus(tenantA, bonus.id);
+
+    // Todavía 'approved' (nunca elegido) — no hay nada que resetear.
+    const result = await bd.resetChosenBonus(tenantA, bonus.id);
+    expect(result).toBeNull();
+
+    const untouched = await bd.getActiveBonusForClient(
+      tenantA,
+      clientId,
+      "America/Bogota",
+    );
+    expect(untouched?.status).toBe("approved");
+  });
+
+  it("resetChosenBonus no reactiva un bono ya 'redeemed'", async () => {
+    const bd = await import("./repository");
+    const appt = await import("@/modules/appointments/repository");
+    const bonusId = await seedChosenBonus();
+    const apptId = await newAppointment();
+
+    await appt.applyBonusDiscountAndRedeem(tenantA, {
+      appointmentId: apptId,
+      bonusId,
+      discountCop: 15000n,
+    });
+
+    const result = await bd.resetChosenBonus(tenantA, bonusId);
+    expect(result).toBeNull();
+
+    const untouched = await bd.getBonusForAppointment(tenantA, apptId);
+    expect(untouched?.status).toBe("redeemed");
   });
 });
