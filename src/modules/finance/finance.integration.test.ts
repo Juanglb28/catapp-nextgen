@@ -209,7 +209,7 @@ describe.runIf(TEST_DB)("finanzas (integración)", () => {
     expect(count).toBe(2);
 
     // Con un corte muy lejano, cuenta las completadas con saldo (3) MÁS la
-    // agendada sin confirmar del 20 jul (D-33); la cancelada NO se cuenta.
+    // agendada no rechazada del 20 jul (D-33/D-34); la cancelada NO se cuenta.
     const far = new Date("2030-01-01T00:00:00Z");
     const countFar = await fin.countOverduePayments(tenantA, far);
     const overdueFar = await fin.pendingPayments(tenantA, { before: far });
@@ -224,7 +224,7 @@ describe.runIf(TEST_DB)("finanzas (integración)", () => {
     expect(await fin.pendingPayments(tenantA)).toHaveLength(3);
   });
 
-  it("D-33: una agendada ya confirmada o rechazada por la clienta NO cuenta como por cobrar", async () => {
+  it("D-33/D-34: una agendada confirmada cuenta como por cobrar; una rechazada NO", async () => {
     const fin = await import("./repository");
     const { db } = await import("@/lib/db");
     const { appointments } = await import("@/modules/appointments/schema");
@@ -235,12 +235,14 @@ describe.runIf(TEST_DB)("finanzas (integración)", () => {
       eq(appointments.status, "scheduled"),
     );
 
+    // Confirmada por la clienta: sigue contando (3 completadas + la agendada).
     await db
       .update(appointments)
       .set({ clientConfirmation: "accepted" })
       .where(scheduled);
-    expect(await fin.countOverduePayments(tenantA, far)).toBe(3);
+    expect(await fin.countOverduePayments(tenantA, far)).toBe(4);
 
+    // Rechazada: la clienta avisó que no asistía, no hay cobro pendiente.
     await db
       .update(appointments)
       .set({ clientConfirmation: "rejected" })
@@ -248,10 +250,10 @@ describe.runIf(TEST_DB)("finanzas (integración)", () => {
     expect(await fin.countOverduePayments(tenantA, far)).toBe(3);
   });
 
-  it("listTenantsWithOverduePayments (D-32/D-33): incluye completadas y agendadas sin confirmar, por tenant", async () => {
+  it("listTenantsWithOverduePayments (D-32/D-33): incluye completadas y agendadas no rechazadas, por tenant", async () => {
     const fin = await import("./repository");
     const rows = await fin.listTenantsWithOverduePayments();
-    // Tenant A: junio, 15 jul, 20 jul (agendada sin confirmar) y 1 ago = 4.
+    // Tenant A: junio, 15 jul, 20 jul (agendada) y 1 ago = 4.
     // Tenant B: 1 completada de julio sin pago = 1.
     expect(rows).toHaveLength(2);
     const a = rows.find((r) => r.tenantId === tenantA);

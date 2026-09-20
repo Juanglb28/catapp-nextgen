@@ -214,9 +214,9 @@ Sin esto, `pnpm test` falla con `column "declined_from_status" of relation "birt
 - Nuevo cron `POST /api/cron/overdue-payments` (`src/app/api/cron/overdue-payments/route.ts`), 8:00 AM Bogotá (`0 13 * * *` UTC). `listTenantsWithOverduePayments()` (cross-tenant, "día anterior" en la TZ de cada tenant) + `overduePaymentsPushPayload` (`src/modules/finance/push.ts`): 1 cita nombra a la clienta, varias resumen con conteo y fecha de la más antigua. La push lleva a `/citas?view=pendientes`. Sin estado: avisa cada mañana mientras haya deuda de días anteriores.
 - Fix en `src/app/sw.ts`: `notificationclick` solo enfocaba la ventana si la app ya estaba abierta y no navegaba a la URL de la notificación (afectaba a todas las push); ahora hace `navigate(url)` y luego `focus()`.
 
-**Ampliación (D-33):** además de las completadas, cuentan las citas **agendadas que la clienta nunca confirmó** (`client_confirmation = pending`), porque hay clientas que no confirman pero sí se atienden. Condición compartida `overdueStatusCondition` para el badge, la tab "Pendientes" (`pendingPayments` con `before`) y el cron. Finanzas no cambia (solo completadas, D-14). Agendadas confirmadas o rechazadas quedan fuera.
+**Ampliación (D-33, luego D-34):** además de las completadas, cuentan las citas **agendadas** que la clienta no rechazó: sin confirmar (D-33, porque hay clientas que no confirman pero sí se atienden) y también confirmadas (D-34). Condición compartida `overdueStatusCondition` para el badge, la tab "Pendientes" (`pendingPayments` con `before`) y el cron. Finanzas no cambia (solo completadas, D-14). Solo las agendadas rechazadas por la clienta quedan fuera.
 
-**Tests:** `finance/push.test.ts` (payload) y casos nuevos en `finance.integration.test.ts` (agendada sin confirmar cuenta; confirmada/rechazada no; consulta del cron por tenant).
+**Tests:** `finance/push.test.ts` (payload) y casos nuevos en `finance.integration.test.ts` (agendada sin confirmar y confirmada cuentan; rechazada no; consulta del cron por tenant).
 
 **Verificado en la máquina de Juan (2026-09-20):** lint, typecheck, tests unitarios y de integración en verde. Nota: los tests de integración comparten una sola DB y deben correr en serie; lanzar dos comandos vitest a la vez produce fallos de llave foránea espurios.
 

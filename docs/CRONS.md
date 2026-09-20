@@ -9,12 +9,12 @@ replicarlos en producción**. Probado y verificado en staging el 2026-07-27.
 
 ## Los crons
 
-| Servicio (Railway)        | Endpoint                            | Schedule (UTC) | Hora Bogotá | Qué hace                                                                                                                                            |
-| ------------------------- | ----------------------------------- | -------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cron-birthdays`          | `POST /api/cron/birthdays`          | `0 11 * * *`   | 6:00 AM     | Crea el bono de cumpleaños del año y notifica por push a la manicurista.                                                                            |
-| `cron-reminder-tomorrow`  | `POST /api/cron/reminder-tomorrow`  | `0 1 * * *`    | 8:00 PM     | Push a cada negocio con citas al día siguiente.                                                                                                     |
-| `cron-cleanup-unverified` | `POST /api/cron/cleanup-unverified` | `0 8 * * *`    | 3:00 AM     | Borra cuentas con correo sin verificar más viejas de 48h (D-22).                                                                                    |
-| `cron-overdue-payments`   | `POST /api/cron/overdue-payments`   | `0 13 * * *`   | 8:00 AM     | Push a cada negocio con citas completadas (o agendadas sin confirmar, D-33) sin cobrar de un día anterior; lleva a `/citas?view=pendientes` (D-32). |
+| Servicio (Railway)        | Endpoint                            | Schedule (UTC) | Hora Bogotá | Qué hace                                                                                                                                                 |
+| ------------------------- | ----------------------------------- | -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cron-birthdays`          | `POST /api/cron/birthdays`          | `0 11 * * *`   | 6:00 AM     | Crea el bono de cumpleaños del año y notifica por push a la manicurista.                                                                                 |
+| `cron-reminder-tomorrow`  | `POST /api/cron/reminder-tomorrow`  | `0 1 * * *`    | 8:00 PM     | Push a cada negocio con citas al día siguiente.                                                                                                          |
+| `cron-cleanup-unverified` | `POST /api/cron/cleanup-unverified` | `0 8 * * *`    | 3:00 AM     | Borra cuentas con correo sin verificar más viejas de 48h (D-22).                                                                                         |
+| `cron-overdue-payments`   | `POST /api/cron/overdue-payments`   | `0 13 * * *`   | 8:00 AM     | Push a cada negocio con citas completadas (o agendadas no rechazadas, D-33/D-34) sin cobrar de un día anterior; lleva a `/citas?view=pendientes` (D-32). |
 
 Hay un cuarto endpoint, `POST /api/cron/reminders` (recordatorios de WhatsApp),
 que solo aplica si se usa la integración de WhatsApp. Si se activa, se monta un

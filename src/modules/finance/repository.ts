@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, ne, or, sql } from "drizzle-orm";
 
 import { tenantMonthRangeUtc } from "@/lib/dates";
 import { db } from "@/lib/db";
@@ -207,18 +207,18 @@ export async function byClient(
 }
 
 /**
- * Estados que cuentan como "por cobrar con antigüedad" (D-29/D-33): las
- * completadas y también las agendadas que la clienta nunca confirmó
- * (`client_confirmation = pending`) — se atendió a la clienta pero la cita
- * nunca se cerró. Las agendadas confirmadas o rechazadas por la clienta NO
- * entran. Solo se aplica a las vistas de "atrasadas" (con `before`), no a
- * Finanzas, que factura únicamente completadas (D-14).
+ * Estados que cuentan como "por cobrar con antigüedad" (D-29/D-33/D-34): las
+ * completadas y también las agendadas que la clienta NO rechazó
+ * (`client_confirmation` = pending o accepted) — se atendió a la clienta, haya
+ * confirmado o no, pero la cita nunca se cerró. Las que la clienta rechazó
+ * (`rejected`) NO entran. Solo se aplica a las vistas de "atrasadas" (con
+ * `before`), no a Finanzas, que factura únicamente completadas (D-14).
  */
 const overdueStatusCondition = or(
   eq(appointments.status, "completed"),
   and(
     eq(appointments.status, "scheduled"),
-    eq(appointments.clientConfirmation, "pending"),
+    ne(appointments.clientConfirmation, "rejected"),
   ),
 );
 
@@ -228,8 +228,8 @@ const overdueStatusCondition = or(
  * todo. No incluye futuras (scheduled) ni canceladas.
  *
  * `opts.before` (D-29): si se pasa, solo incluye citas con `starts_at` anterior
- * a esa fecha/hora y, además de las completadas, las agendadas sin confirmar
- * por la clienta (D-33). Lo usa la vista "Citas pendientes de cobro" (antigüedad
+ * a esa fecha/hora y, además de las completadas, las agendadas no rechazadas
+ * por la clienta (D-33/D-34). Lo usa la vista "Citas pendientes de cobro" (antigüedad
  * >= 1 día calendario, TZ del tenant) — el llamador pasa el inicio del día de
  * hoy en esa TZ.
  */
@@ -253,7 +253,7 @@ export async function pendingPayments(
     .where(
       and(
         eq(appointments.tenantId, tenantId),
-        // Con `before` (vista de atrasadas, D-33) incluye agendadas sin confirmar.
+        // Con `before` (vista de atrasadas, D-33) incluye agendadas no rechazadas (D-34).
         opts?.before
           ? overdueStatusCondition
           : eq(appointments.status, "completed"),
@@ -278,7 +278,7 @@ export async function pendingPayments(
 
 /**
  * Cuenta citas pendientes de cobro con antigüedad >= 1 día calendario (D-29):
- * completadas o agendadas sin confirmar (D-33), con saldo > 0 y `starts_at` anterior a `before` (el llamador
+ * completadas o agendadas no rechazadas (D-33/D-34), con saldo > 0 y `starts_at` anterior a `before` (el llamador
  * pasa el inicio del día de hoy en la TZ del tenant). Se usa para la alerta /
  * badge global en la navegación — conteo liviano, sin traer filas.
  */
@@ -303,7 +303,7 @@ export async function countOverduePayments(
 export type TenantOverduePayments = {
   tenantId: string;
   timezone: string;
-  /** Citas por cobrar (completadas o agendadas sin confirmar) con antigüedad >= 1 día calendario (TZ del tenant). */
+  /** Citas por cobrar (completadas o agendadas no rechazadas) con antigüedad >= 1 día calendario (TZ del tenant). */
   count: number;
   /** Clienta de la cita más antigua (para el texto cuando count === 1). */
   oldestClientName: string;
@@ -312,8 +312,8 @@ export type TenantOverduePayments = {
 
 /**
  * Consulta de SISTEMA (cross-tenant) para el cron de recordatorio de cobro
- * (D-32/D-33): tenants con al menos una cita completada —o agendada sin
- * confirmar por la clienta— con saldo pendiente cuya
+ * (D-32/D-33/D-34): tenants con al menos una cita completada —o agendada no
+ * rechazada por la clienta— con saldo pendiente cuya
  * fecha local (TZ de CADA tenant, R-D4) es anterior al día de hoy en esa TZ.
  * Misma definición de "pendiente de cobro" que `countOverduePayments` (D-29).
  */

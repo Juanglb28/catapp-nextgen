@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /**
  * Cron de recordatorio de cobro (D-32). Se ejecuta una vez al día
  * (8:00 AM Bogotá = 13:00 UTC). Por cada tenant con citas completadas (o
- * agendadas sin confirmar, D-33) y con saldo pendiente de un día anterior (D-29), envía una push que lleva a
+ * agendadas no rechazadas, D-33/D-34) y con saldo pendiente de un día anterior (D-29), envía una push que lleva a
  * `/citas?view=pendientes`. Sin estado: recuerda cada día mientras haya deuda.
  * Protegido por `Authorization: Bearer CRON_SECRET`.
  */

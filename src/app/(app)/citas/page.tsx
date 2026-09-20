@@ -548,7 +548,7 @@ async function WeekView({
 // ─── Vista Pendientes ─────────────────────────────────────────────────────────
 
 /**
- * Citas pendientes de cobro (D-29/D-33): completadas o agendadas sin confirmar
+ * Citas pendientes de cobro (D-29/D-33): completadas o agendadas no rechazadas
  * por la clienta, con saldo > 0 y antigüedad
  * >= 1 día calendario (cambio de día en la TZ del tenant) — `todayStart` es el
  * inicio del día de hoy, así que solo entran citas de días anteriores. Reusa
