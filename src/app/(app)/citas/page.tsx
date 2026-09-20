@@ -548,7 +548,8 @@ async function WeekView({
 // ─── Vista Pendientes ─────────────────────────────────────────────────────────
 
 /**
- * Citas pendientes de cobro (D-29): completadas, con saldo > 0 y antigüedad
+ * Citas pendientes de cobro (D-29/D-33): completadas o agendadas sin confirmar
+ * por la clienta, con saldo > 0 y antigüedad
  * >= 1 día calendario (cambio de día en la TZ del tenant) — `todayStart` es el
  * inicio del día de hoy, así que solo entran citas de días anteriores. Reusa
  * `pendingPayments` (F6.B1) y el mismo patrón de cobranza por WhatsApp de
@@ -570,7 +571,7 @@ async function PendientesView({
       <EmptyState
         icon={Wallet}
         title="Sin citas pendientes de cobro"
-        description="No tienes citas completadas de dias anteriores con saldo pendiente."
+        description="No tienes citas de dias anteriores con saldo pendiente."
       />
     );
   }

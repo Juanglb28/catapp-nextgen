@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 
 import { tenantMonthRangeUtc } from "@/lib/dates";
 import { db } from "@/lib/db";
@@ -207,12 +207,29 @@ export async function byClient(
 }
 
 /**
+ * Estados que cuentan como "por cobrar con antigüedad" (D-29/D-33): las
+ * completadas y también las agendadas que la clienta nunca confirmó
+ * (`client_confirmation = pending`) — se atendió a la clienta pero la cita
+ * nunca se cerró. Las agendadas confirmadas o rechazadas por la clienta NO
+ * entran. Solo se aplica a las vistas de "atrasadas" (con `before`), no a
+ * Finanzas, que factura únicamente completadas (D-14).
+ */
+const overdueStatusCondition = or(
+  eq(appointments.status, "completed"),
+  and(
+    eq(appointments.status, "scheduled"),
+    eq(appointments.clientConfirmation, "pending"),
+  ),
+);
+
+/**
  * Citas COMPLETADAS con saldo pendiente (de cualquier fecha), de la más antigua
  * a la más reciente. Es la lista de "por cobrar": trabajo hecho sin pagar del
  * todo. No incluye futuras (scheduled) ni canceladas.
  *
  * `opts.before` (D-29): si se pasa, solo incluye citas con `starts_at` anterior
- * a esa fecha/hora. Lo usa la vista "Citas pendientes de cobro" (antigüedad
+ * a esa fecha/hora y, además de las completadas, las agendadas sin confirmar
+ * por la clienta (D-33). Lo usa la vista "Citas pendientes de cobro" (antigüedad
  * >= 1 día calendario, TZ del tenant) — el llamador pasa el inicio del día de
  * hoy en esa TZ.
  */
@@ -236,7 +253,10 @@ export async function pendingPayments(
     .where(
       and(
         eq(appointments.tenantId, tenantId),
-        eq(appointments.status, "completed"),
+        // Con `before` (vista de atrasadas, D-33) incluye agendadas sin confirmar.
+        opts?.before
+          ? overdueStatusCondition
+          : eq(appointments.status, "completed"),
         sql`${appointments.totalCop} - ${appointments.bonusDiscountCop} > ${appointments.paidCop}`,
         opts?.before ? lt(appointments.startsAt, opts.before) : undefined,
       ),
@@ -258,7 +278,7 @@ export async function pendingPayments(
 
 /**
  * Cuenta citas pendientes de cobro con antigüedad >= 1 día calendario (D-29):
- * completadas, con saldo > 0 y `starts_at` anterior a `before` (el llamador
+ * completadas o agendadas sin confirmar (D-33), con saldo > 0 y `starts_at` anterior a `before` (el llamador
  * pasa el inicio del día de hoy en la TZ del tenant). Se usa para la alerta /
  * badge global en la navegación — conteo liviano, sin traer filas.
  */
@@ -272,7 +292,7 @@ export async function countOverduePayments(
     .where(
       and(
         eq(appointments.tenantId, tenantId),
-        eq(appointments.status, "completed"),
+        overdueStatusCondition,
         sql`${appointments.totalCop} - ${appointments.bonusDiscountCop} > ${appointments.paidCop}`,
         lt(appointments.startsAt, before),
       ),
@@ -283,7 +303,7 @@ export async function countOverduePayments(
 export type TenantOverduePayments = {
   tenantId: string;
   timezone: string;
-  /** Citas completadas con saldo y antigüedad >= 1 día calendario (TZ del tenant). */
+  /** Citas por cobrar (completadas o agendadas sin confirmar) con antigüedad >= 1 día calendario (TZ del tenant). */
   count: number;
   /** Clienta de la cita más antigua (para el texto cuando count === 1). */
   oldestClientName: string;
@@ -292,7 +312,8 @@ export type TenantOverduePayments = {
 
 /**
  * Consulta de SISTEMA (cross-tenant) para el cron de recordatorio de cobro
- * (D-32): tenants con al menos una cita completada con saldo pendiente cuya
+ * (D-32/D-33): tenants con al menos una cita completada —o agendada sin
+ * confirmar por la clienta— con saldo pendiente cuya
  * fecha local (TZ de CADA tenant, R-D4) es anterior al día de hoy en esa TZ.
  * Misma definición de "pendiente de cobro" que `countOverduePayments` (D-29).
  */
@@ -312,7 +333,7 @@ export async function listTenantsWithOverduePayments(): Promise<
     .innerJoin(clients, eq(clients.id, appointments.clientId))
     .where(
       and(
-        eq(appointments.status, "completed"),
+        overdueStatusCondition,
         sql`${appointments.totalCop} - ${appointments.bonusDiscountCop} > ${appointments.paidCop}`,
         sql`(${appointments.startsAt} at time zone ${tenants.timezone})::date < (now() at time zone ${tenants.timezone})::date`,
       ),

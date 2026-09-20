@@ -208,12 +208,57 @@ describe.runIf(TEST_DB)("finanzas (integración)", () => {
     const count = await fin.countOverduePayments(tenantA, cutoff);
     expect(count).toBe(2);
 
-    // Con un corte muy lejano, cuenta las 3 pendientes (agendada y cancelada NO
-    // se cuentan aunque su fecha sea anterior al corte).
+    // Con un corte muy lejano, cuenta las completadas con saldo (3) MÁS la
+    // agendada sin confirmar del 20 jul (D-33); la cancelada NO se cuenta.
     const far = new Date("2030-01-01T00:00:00Z");
     const countFar = await fin.countOverduePayments(tenantA, far);
-    const all = await fin.pendingPayments(tenantA);
-    expect(countFar).toBe(all.length);
+    const overdueFar = await fin.pendingPayments(tenantA, { before: far });
+    expect(countFar).toBe(4);
+    expect(overdueFar.map((p) => p.saldo)).toEqual([
+      6000n,
+      15000n,
+      10000n,
+      10000n,
+    ]);
+    // Finanzas (sin `before`) sigue mostrando solo completadas.
+    expect(await fin.pendingPayments(tenantA)).toHaveLength(3);
+  });
+
+  it("D-33: una agendada ya confirmada o rechazada por la clienta NO cuenta como por cobrar", async () => {
+    const fin = await import("./repository");
+    const { db } = await import("@/lib/db");
+    const { appointments } = await import("@/modules/appointments/schema");
+    const { and, eq } = await import("drizzle-orm");
+    const far = new Date("2030-01-01T00:00:00Z");
+    const scheduled = and(
+      eq(appointments.tenantId, tenantA),
+      eq(appointments.status, "scheduled"),
+    );
+
+    await db
+      .update(appointments)
+      .set({ clientConfirmation: "accepted" })
+      .where(scheduled);
+    expect(await fin.countOverduePayments(tenantA, far)).toBe(3);
+
+    await db
+      .update(appointments)
+      .set({ clientConfirmation: "rejected" })
+      .where(scheduled);
+    expect(await fin.countOverduePayments(tenantA, far)).toBe(3);
+  });
+
+  it("listTenantsWithOverduePayments (D-32/D-33): incluye completadas y agendadas sin confirmar, por tenant", async () => {
+    const fin = await import("./repository");
+    const rows = await fin.listTenantsWithOverduePayments();
+    // Tenant A: junio, 15 jul, 20 jul (agendada sin confirmar) y 1 ago = 4.
+    // Tenant B: 1 completada de julio sin pago = 1.
+    expect(rows).toHaveLength(2);
+    const a = rows.find((r) => r.tenantId === tenantA);
+    const b = rows.find((r) => r.tenantId === tenantB);
+    expect(a?.count).toBe(4);
+    expect(a?.oldestClientName).toBe("Ana");
+    expect(b?.count).toBe(1);
   });
 
   it("aislamiento A/B: las cifras de B no aparecen en A", async () => {
