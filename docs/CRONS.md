@@ -9,11 +9,12 @@ replicarlos en producción**. Probado y verificado en staging el 2026-07-27.
 
 ## Los crons
 
-| Servicio (Railway)         | Endpoint                             | Schedule (UTC) | Hora Bogotá | Qué hace                                                                 |
-| --------------------------- | ------------------------------------- | -------------- | ----------- | ------------------------------------------------------------------------ |
-| `cron-birthdays`           | `POST /api/cron/birthdays`           | `0 11 * * *`   | 6:00 AM     | Crea el bono de cumpleaños del año y notifica por push a la manicurista. |
-| `cron-reminder-tomorrow`   | `POST /api/cron/reminder-tomorrow`   | `0 1 * * *`    | 8:00 PM     | Push a cada negocio con citas al día siguiente.                          |
-| `cron-cleanup-unverified`  | `POST /api/cron/cleanup-unverified`  | `0 8 * * *`    | 3:00 AM     | Borra cuentas con correo sin verificar más viejas de 48h (D-22).         |
+| Servicio (Railway)        | Endpoint                            | Schedule (UTC) | Hora Bogotá | Qué hace                                                                                                          |
+| ------------------------- | ----------------------------------- | -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------- |
+| `cron-birthdays`          | `POST /api/cron/birthdays`          | `0 11 * * *`   | 6:00 AM     | Crea el bono de cumpleaños del año y notifica por push a la manicurista.                                          |
+| `cron-reminder-tomorrow`  | `POST /api/cron/reminder-tomorrow`  | `0 1 * * *`    | 8:00 PM     | Push a cada negocio con citas al día siguiente.                                                                   |
+| `cron-cleanup-unverified` | `POST /api/cron/cleanup-unverified` | `0 8 * * *`    | 3:00 AM     | Borra cuentas con correo sin verificar más viejas de 48h (D-22).                                                  |
+| `cron-overdue-payments`   | `POST /api/cron/overdue-payments`   | `0 13 * * *`   | 8:00 AM     | Push a cada negocio con citas completadas sin cobrar de un día anterior; lleva a `/citas?view=pendientes` (D-32). |
 
 Hay un cuarto endpoint, `POST /api/cron/reminders` (recordatorios de WhatsApp),
 que solo aplica si se usa la integración de WhatsApp. Si se activa, se monta un
@@ -64,6 +65,16 @@ Cada cron es un servicio con:
 - **Cron Schedule:** la expresión en **UTC** (ver tabla).
 - **Restart Policy:** **Never** (un fallo no reintenta ni arriesga notificaciones
   duplicadas; el propio scheduler lo vuelve a correr al día siguiente).
+
+### Cron de cobros pendientes (D-32) — pendiente de crear en Railway
+
+Igual que los demás: servicio `cron-overdue-payments`, imagen `node:22-alpine`, `CRON_SECRET` por referencia, Restart Policy Never, Cron Schedule `0 13 * * *` (8:00 AM Bogotá) y este Start Command:
+
+```
+node -e "fetch('https://<APP-PUBLICA>/api/cron/overdue-payments',{method:'POST',headers:{Authorization:'Bearer '+process.env.CRON_SECRET}}).then(async r=>{console.log('status',r.status,await r.text());process.exit(r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"
+```
+
+Respuesta esperada: `{"ok":true,"tenantsWithOverdue":N,"notified":M}`.
 
 ### Start commands (copiar/pegar; ajustar la URL pública)
 
@@ -189,7 +200,7 @@ también en `docs/CUTOVER-CHECKLIST.md`), usando:
 - App: `catapp-nextgen` (`https://catapp-nextgen-production.up.railway.app`).
 - Crons: `cron-birthdays` (`0 11 * * *`), `cron-reminder-tomorrow` (`0 1 * * *`),
   `cron-cleanup-unverified` (`0 8 * * *`) — probado con "Run now" → `status 200
-  {"ok":true,"deleted":0,"staleHours":48}` (2026-08-06).
+{"ok":true,"deleted":0,"staleHours":48}` (2026-08-06).
 
 ## Referencia rápida (producción) — creados y verificados 2026-07-29
 

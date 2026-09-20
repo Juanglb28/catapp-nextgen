@@ -9,6 +9,7 @@ import {
   appointments,
 } from "@/modules/appointments/schema";
 import { services } from "@/modules/services/schema";
+import { tenants } from "@/modules/tenancy/schema";
 
 /**
  * Capa de datos financiera (F6.B1). Las finanzas se DERIVAN de `appointments`
@@ -277,6 +278,51 @@ export async function countOverduePayments(
       ),
     );
   return row?.count ?? 0;
+}
+
+export type TenantOverduePayments = {
+  tenantId: string;
+  timezone: string;
+  /** Citas completadas con saldo y antigüedad >= 1 día calendario (TZ del tenant). */
+  count: number;
+  /** Clienta de la cita más antigua (para el texto cuando count === 1). */
+  oldestClientName: string;
+  oldestStartsAt: Date;
+};
+
+/**
+ * Consulta de SISTEMA (cross-tenant) para el cron de recordatorio de cobro
+ * (D-32): tenants con al menos una cita completada con saldo pendiente cuya
+ * fecha local (TZ de CADA tenant, R-D4) es anterior al día de hoy en esa TZ.
+ * Misma definición de "pendiente de cobro" que `countOverduePayments` (D-29).
+ */
+export async function listTenantsWithOverduePayments(): Promise<
+  TenantOverduePayments[]
+> {
+  const rows = await db
+    .select({
+      tenantId: appointments.tenantId,
+      timezone: tenants.timezone,
+      count: sql<number>`cast(count(*) as int)`,
+      oldestClientName: sql<string>`(array_agg(${clients.name} order by ${appointments.startsAt} asc))[1]`,
+      oldestStartsAt: sql<Date>`min(${appointments.startsAt})`,
+    })
+    .from(appointments)
+    .innerJoin(tenants, eq(appointments.tenantId, tenants.id))
+    .innerJoin(clients, eq(clients.id, appointments.clientId))
+    .where(
+      and(
+        eq(appointments.status, "completed"),
+        sql`${appointments.totalCop} - ${appointments.bonusDiscountCop} > ${appointments.paidCop}`,
+        sql`(${appointments.startsAt} at time zone ${tenants.timezone})::date < (now() at time zone ${tenants.timezone})::date`,
+      ),
+    )
+    .groupBy(appointments.tenantId, tenants.timezone);
+
+  return rows.map((r) => ({
+    ...r,
+    oldestStartsAt: new Date(r.oldestStartsAt),
+  }));
 }
 
 /** Total facturado por día del mes (citas completadas), en la TZ del tenant. */

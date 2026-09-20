@@ -67,10 +67,19 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clientList) => {
+      .then(async (clientList) => {
+        // Si la app ya está abierta, la enfoca Y la lleva a la URL de la
+        // notificación (antes solo enfocaba y dejaba al usuario donde estaba).
         for (const client of clientList) {
           if ("focus" in client) {
-            void client.focus();
+            if ("navigate" in client) {
+              try {
+                await (client as WindowClient).navigate(url);
+              } catch {
+                /* navegación no permitida: al menos se enfoca */
+              }
+            }
+            await client.focus();
             return;
           }
         }
