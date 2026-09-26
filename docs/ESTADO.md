@@ -241,7 +241,7 @@ Sin esto, `pnpm test` falla con `column "declined_from_status" of relation "birt
 
 **Limitaciones aceptadas (fase 1):** (1) es un control de acceso local, no cifrado: alguien con acceso técnico al teléfono desbloqueado (DevTools) podría leer la caché — el cifrado de datos offline queda como mejora futura; (2) la huella offline confía en la verificación del sistema operativo (no se valida la firma contra el servidor); (3) tras cambiar la contraseña desde otro dispositivo, la anterior sigue sirviendo offline en este teléfono hasta el próximo inicio de sesión o desbloqueo con contraseña en línea; (4) los botones de crear/editar siguen visibles sin red: al tocarlos lleva a `/offline` o la acción falla sin perder lo escrito (D-12); (5) si el teléfono no tiene huella registrada y la sesión se inició con Google, no hay forma de desbloquear offline (la pantalla lo explica).
 
-**Verificado en la máquina de Juan (2026-09-26):** todos los tests en verde. **Pendiente:** prueba en teléfono real (instalar la PWA, abrir con datos, poner modo avión, abrir la app).
+**Verificado en la máquina de Juan (2026-09-26):** todos los tests en verde. **Prueba en teléfono real (Android, staging, 2026-09-26): OK** — desbloqueo sin red, agenda/detalle/clientas en solo consulta, Finanzas/Ajustes/Cumpleaños/Nueva cita → pantalla Atardecer sin mostrar su contenido, botón de vuelta a la agenda. **Desplegado a producción el 2026-09-26** (merge de `feat/offline-d35` a `main`, commit `0ae89f1`); staging vuelve a desplegar desde `main`. Nota: para probar en staging hay que abrir su URL en Chrome (el ícono instalado de CatApp abre catapp.beauty, producción).
 
 ### Sistema de bonos de cumpleaños — detalle
 
