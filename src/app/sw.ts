@@ -1,6 +1,17 @@
 import { defaultCache } from "@serwist/next/worker";
-import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import type {
+  PrecacheEntry,
+  RuntimeCaching,
+  SerwistGlobalConfig,
+} from "serwist";
+import { ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
+
+import {
+  LEGACY_CACHES,
+  OFFLINE_CACHE_MAX_AGE_S,
+  OFFLINE_PAGES_CACHE,
+  isOfflinePagePath,
+} from "@/modules/offline/constants";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -11,6 +22,57 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+/**
+ * Perímetro del modo offline de solo consulta (D-35). Va ANTES de
+ * `defaultCache`, que cacheaba cualquier página (incluidas Finanzas/Ajustes) y
+ * los GET de /api:
+ *  1. /api/* → siempre red (el latido /api/offline/status nunca debe salir de
+ *     caché, y ningún dato de API queda guardado en el teléfono).
+ *  2. Payloads RSC (navegación interna de Next) → siempre red. Sin conexión
+ *     Next cae a navegación completa del documento, que resuelve la regla 3.
+ *  3. Citas y Clientas (documento HTML) → NetworkFirst en una caché propia;
+ *     aquí también caen las descargas por adelantado de `warmIfDue`.
+ *  4. Cualquier otra navegación → siempre red (sin red: fallback /offline).
+ */
+const offlineRuntimeCaching: RuntimeCaching[] = [
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname.startsWith("/api/"),
+    handler: new NetworkOnly(),
+  },
+  {
+    matcher: ({ sameOrigin, request }) =>
+      sameOrigin && request.headers.get("RSC") === "1",
+    handler: new NetworkOnly(),
+  },
+  {
+    matcher: ({ sameOrigin, request, url }) =>
+      sameOrigin && request.method === "GET" && isOfflinePagePath(url.pathname),
+    handler: new NetworkFirst({
+      cacheName: OFFLINE_PAGES_CACHE,
+      networkTimeoutSeconds: 8,
+      // La navegación y la descarga por `fetch` difieren en cabeceras Vary.
+      matchOptions: { ignoreVary: true },
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 150,
+          maxAgeSeconds: OFFLINE_CACHE_MAX_AGE_S,
+        }),
+        {
+          // Solo 200 "reales": nunca guardar un redirect a /login bajo /citas.
+          cacheWillUpdate: async ({ response }) =>
+            response.status === 200 && !response.redirected ? response : null,
+        },
+      ],
+    }),
+  },
+  {
+    matcher: ({ sameOrigin, request }) =>
+      sameOrigin && request.mode === "navigate",
+    handler: new NetworkOnly(),
+  },
+];
+
 const serwist = new Serwist({
   // App shell + estáticos del build (CacheFirst implícito del precache).
   precacheEntries: self.__SW_MANIFEST,
@@ -18,9 +80,8 @@ const serwist = new Serwist({
   skipWaiting: false,
   clientsClaim: true,
   navigationPreload: true,
-  // defaultCache: páginas/navegación con NetworkFirst (datos frescos con red,
-  // caché como respaldo sin señal); estáticos con CacheFirst.
-  runtimeCaching: defaultCache,
+  // Perímetro offline propio (D-35) + defaultCache para estáticos.
+  runtimeCaching: [...offlineRuntimeCaching, ...defaultCache],
   // Si una navegación falla y la ruta no está cacheada, mostramos /offline.
   fallbacks: {
     entries: [
@@ -30,6 +91,13 @@ const serwist = new Serwist({
       },
     ],
   },
+});
+
+// D-35: borra las cachés que antes guardaban cualquier página/API.
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    Promise.all(LEGACY_CACHES.map((name) => caches.delete(name))),
+  );
 });
 
 // El toast "Hay una nueva versión" hace postMessage para activar el SW nuevo.

@@ -187,6 +187,31 @@ export async function listAppointmentsByRange(
 }
 
 /**
+ * Referencias (id de cita + id de clienta) de las citas NO canceladas cuyo
+ * inicio cae en `[start, end)`, para el manifiesto de descarga offline (D-35).
+ */
+export async function listAppointmentRefsInRange(
+  tenantId: string,
+  start: Date,
+  end: Date,
+  limit: number,
+): Promise<{ id: string; clientId: string }[]> {
+  return db
+    .select({ id: appointments.id, clientId: appointments.clientId })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        gte(appointments.startsAt, start),
+        lt(appointments.startsAt, end),
+        ne(appointments.status, "cancelled"),
+      ),
+    )
+    .orderBy(asc(appointments.startsAt))
+    .limit(limit);
+}
+
+/**
  * Citas del tenant (no canceladas) que se solapan con `[startsAt, endsAt)`.
  * Dos rangos se solapan si `existente.starts < nuevo.ends` y
  * `existente.ends > nuevo.starts`. Se puede excluir una cita (al editar).

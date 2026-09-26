@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
+import { rememberPasswordForOffline } from "@/modules/offline/client";
 
 export function UnlockForm({ next }: { next: string }) {
   const router = useRouter();
@@ -52,6 +53,8 @@ export function UnlockForm({ next }: { next: string }) {
         body: JSON.stringify({ password }),
       });
       if (!res.ok) throw new Error("invalid");
+      // D-35: refresca el verificador offline (p. ej. tras cambiar la contraseña).
+      await rememberPasswordForOffline(password, { fresh: false });
       done();
     } catch {
       toast.error("Contraseña incorrecta.");

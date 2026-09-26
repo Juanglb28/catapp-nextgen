@@ -2,12 +2,13 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 
 import { BottomNav } from "@/components/bottom-nav";
-import { OfflineBanner } from "@/components/offline-banner";
 import { PushManager } from "@/components/push-manager";
 import { SwUpdater } from "@/components/sw-updater";
 import { tenantDayKey, tenantDayRangeUtc } from "@/lib/dates";
 import { pendingBirthdayBonusCount } from "@/modules/birthdays/repository";
 import { countOverduePayments } from "@/modules/finance/repository";
+import { OfflineGate } from "@/modules/offline/components/offline-gate";
+import { OFFLINE_PENDING_SCRIPT } from "@/modules/offline/constants";
 import { getTenantCached, requireTenant } from "@/modules/tenancy/context";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -34,6 +35,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
+      {/* D-35: sin red, oculta el contenido cacheado hasta que OfflineGate
+          confirme ventana vigente + desbloqueo local. Corre antes de hidratar. */}
+      <script dangerouslySetInnerHTML={{ __html: OFFLINE_PENDING_SCRIPT }} />
       <header className="bg-background/90 sticky top-0 z-40 flex h-14 items-center justify-between border-b px-4 backdrop-blur">
         <div className="flex items-center gap-1.5">
           <Image
@@ -61,9 +65,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <OfflineBanner />
-
-      <main className="flex-1 px-4 pt-5 pb-24">{children}</main>
+      <OfflineGate>
+        <main className="flex-1 px-4 pt-5 pb-24">{children}</main>
+      </OfflineGate>
 
       <BottomNav birthdayCount={birthdayCount} overdueCount={overdueCount} />
       <SwUpdater />

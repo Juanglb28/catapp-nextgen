@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { rememberPasswordForOffline } from "@/modules/offline/client";
 import { authClient } from "@/lib/auth-client";
 import {
   loginSchema,
@@ -53,6 +54,9 @@ export function LoginForm({ resetOk = false }: { resetOk?: boolean }) {
       setServerError("Correo o contraseña incorrectos.");
       return;
     }
+    // D-35: verificador local para desbloquear sin conexión (no se guarda la
+    // contraseña). `fresh`: puede ser otra cuenta → se borra lo offline previo.
+    await rememberPasswordForOffline(values.password, { fresh: true });
     router.push("/citas");
     router.refresh();
   }

@@ -222,6 +222,27 @@ Sin esto, `pnpm test` falla con `column "declined_from_status" of relation "birt
 
 **Operativo:** servicio `cron-overdue-payments` creado en producción (`Project_Independency_CatApp`, imagen `node:22-alpine`, `CRON_SECRET` referenciado, Restart Policy Never, schedule `0 13 * * *`); config verificada. **Pendiente:** prueba con "Run now" tras desplegar D-33 y confirmar `status 200` (receta en `docs/CRONS.md`).
 
+### 📴 Feature — Modo offline de solo consulta, fase inicial (2026-09-25, D-35)
+
+**Pedido de Juan:** que la app siga siendo útil en cortes de conexión, empezando por solo consulta. Definiciones confirmadas con Juan por `AskUserQuestion`: pantallas = **Citas + Clientas** (Finanzas/Ajustes/Cumpleaños/Inventario fuera); contraseña offline = **la de la cuenta** (se guarda solo un hash local); datos = **descarga por adelantado**; desbloqueo = **al abrir la app sin red y tras 15 min inactiva**.
+
+**Cambio:**
+
+- Módulo nuevo `src/modules/offline/`: `constants.ts` (perímetro `isOfflinePagePath`, 24 h, 15 min, tolerancia de reloj 5 min), `policy.ts` (reglas puras: ventana, manipulación del reloj, inactividad), `password-verifier.ts` (PBKDF2-SHA256 310k iteraciones + sal aleatoria vía WebCrypto), `webauthn-local.ts` (huella sin servidor: `navigator.credentials.get` con `userVerification: required` sobre las credenciales ya registradas para D-17, exige bandera UV), `store.ts` (IndexedDB `catapp-offline` + sessionStorage para el desbloqueo de la pestaña), `client.ts` (latido, descarga por adelantado, captura del verificador), `urls.ts`/`manifest.ts` (qué descargar).
+- `OfflineGate` (`modules/offline/components/offline-gate.tsx`) envuelve el `<main>` del layout (app). Con red: latido a `/api/offline/status` (reinicia la ventana de 24 h, trae credenciales de huella) y descarga por adelantado cada 30 min vía `/api/offline/manifest`: agenda de hoy + 7 días, vistas Semana/Próximas/Pendientes, lista de clientas y detalle de cada cita (y su clienta) de esos días (tope 80). Sin red (o latido fallido = "lie-fi"): ventana vigente + reloj sin retroceder + desbloqueo local; si no, pantalla "Conéctate para seguir" / "Revisa la fecha y hora" y **se borran las páginas guardadas**. Banner "Sin conexión — solo consulta · disponible N h más". Un script previo a la hidratación oculta el contenido cacheado sin red hasta que el gate decide (sin flash de datos).
+- `sw.ts`: reglas propias ANTES de `defaultCache`: `/api/*` y payloads RSC siempre red; `/citas*` y `/clientas*` (documento) NetworkFirst en caché `catapp-offline-pages` (25 h, 150 entradas, nunca guarda redirects); cualquier otra navegación siempre red → fallback `/offline`. Al activar, borra las cachés viejas de `defaultCache` (`pages`, `others`, `apis`…), que antes guardaban también Finanzas y GETs de API.
+- Captura del verificador en `login-form.tsx` (borra antes todo lo offline: puede ser otra cuenta) y en `/desbloquear` (refresca tras cambio de contraseña). `LogoutButton` borra todo (páginas, estado, verificador, credenciales) antes de `signOut`; un 401 del latido hace lo mismo.
+- **Fix de F9.B1:** la página `/offline` nunca entraba al precache (las páginas del App Router no se incluyen solas), así que el fallback sin red no podía funcionar. Se agrega con `additionalPrecacheEntries` en `next.config.ts`.
+- `/offline` ahora explica que sin conexión solo se consultan Citas y Clientas, con link a la agenda.
+
+**Tests:** `offline/policy.test.ts` (ventana, manipulación de reloj, inactividad, perímetro de rutas), `password-verifier.test.ts`, `webauthn-local.test.ts`, `urls.test.ts`. Suite unitaria completa 34 archivos / 243 tests en verde; `tsc`, eslint y `next build` limpios (verificado en sandbox con copia del repo).
+
+**Prueba de punta a punta (sandbox, build de producción + Chromium, servidor apagado para simular sin red):** login → 16 páginas descargadas (ninguna de Finanzas/Ajustes/API); sin red la app pide contraseña al abrir, rechaza una incorrecta y con la correcta muestra agenda, detalle de cita y clientas sin volver a pedirla; Finanzas sin red → página `/offline`; 16 min sin uso → vuelve a pedir desbloqueo; reloj atrasado 3 h → bloqueada y páginas borradas; reconexión → re-descarga; 25 h sin red → bloqueada y páginas borradas; cerrar sesión → no queda nada en el teléfono.
+
+**Limitaciones aceptadas (fase 1):** (1) es un control de acceso local, no cifrado: alguien con acceso técnico al teléfono desbloqueado (DevTools) podría leer la caché — el cifrado de datos offline queda como mejora futura; (2) la huella offline confía en la verificación del sistema operativo (no se valida la firma contra el servidor); (3) tras cambiar la contraseña desde otro dispositivo, la anterior sigue sirviendo offline en este teléfono hasta el próximo inicio de sesión o desbloqueo con contraseña en línea; (4) los botones de crear/editar siguen visibles sin red: al tocarlos lleva a `/offline` o la acción falla sin perder lo escrito (D-12); (5) si el teléfono no tiene huella registrada y la sesión se inició con Google, no hay forma de desbloquear offline (la pantalla lo explica).
+
+**Verificado en la máquina de Juan (2026-09-26):** todos los tests en verde. **Pendiente:** prueba en teléfono real (instalar la PWA, abrir con datos, poner modo avión, abrir la app).
+
 ### Sistema de bonos de cumpleaños — detalle
 
 - **DB**: columna `birthday_date` (date) en `clients`; columna `birthday_gcal_event_id` (text); tabla `birthday_bonuses` (enum status, public_token); tabla `push_subscriptions`. Migraciones 0016–0018.

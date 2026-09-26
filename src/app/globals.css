@@ -477,3 +477,9 @@
 @utility animate-gift-fade-in {
   animation: gift-fade-in 0.45s ease-out both;
 }
+
+/* D-35: sin red, el contenido cacheado queda oculto hasta que OfflineGate
+   confirme la ventana de 24 h y el desbloqueo local (ver offline-gate.tsx). */
+html[data-offline-pending] [data-offline-content] {
+  visibility: hidden;
+}

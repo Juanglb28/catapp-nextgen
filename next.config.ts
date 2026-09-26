@@ -1,4 +1,6 @@
 import { withSentryConfig } from "@sentry/nextjs";
+import { randomUUID } from "node:crypto";
+
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
 
@@ -84,6 +86,15 @@ const withSerwist = withSerwistInit({
   // Service worker only in production; in dev it would interfere with HMR.
   disable: process.env.NODE_ENV === "development",
   reloadOnOnline: true,
+  // La página /offline es el respaldo de navegación sin red (F9.B1/D-35). Las
+  // páginas del App Router no entran solas al precache, así que sin esto el
+  // fallback nunca encontraba la página. La revisión cambia en cada build.
+  additionalPrecacheEntries: [
+    {
+      url: "/offline",
+      revision: process.env.RAILWAY_GIT_COMMIT_SHA ?? randomUUID(),
+    },
+  ],
 });
 
 /**
