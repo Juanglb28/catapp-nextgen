@@ -19,12 +19,14 @@ test.describe("modo offline", () => {
   }) => {
     // Cargar /offline con red normal — verifica que existe y tiene contenido.
     await page.goto("/offline");
-    await expect(
-      page.getByRole("heading", { name: /sin conexión/i }),
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole("heading", { name: "CatApp" })).toBeVisible({
+      timeout: 5_000,
+    });
 
     // El texto de descripción también debe estar presente.
-    await expect(page.getByText(/no hay internet/i)).toBeVisible();
+    await expect(
+      page.getByText(/no disponible en modo sin conexión/i),
+    ).toBeVisible();
   });
 
   test("la app no muestra pantalla en blanco al cortar la red en /citas", async ({
@@ -67,9 +69,9 @@ test.describe("modo offline", () => {
         waitUntil: "domcontentloaded",
         timeout: 5_000,
       });
-      await expect(
-        page.getByRole("heading", { name: /sin conexión/i }),
-      ).toBeVisible({ timeout: 3_000 });
+      await expect(page.getByRole("heading", { name: "CatApp" })).toBeVisible({
+        timeout: 3_000,
+      });
     } catch {
       // El SW no estaba activo (app en modo dev o primer load sin SW):
       // consideramos el test inconcluso, no un fallo de la app.

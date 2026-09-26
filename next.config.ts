@@ -80,6 +80,8 @@ const nextConfig: NextConfig = {
   },
 };
 
+const PRECACHE_REVISION = process.env.RAILWAY_GIT_COMMIT_SHA ?? randomUUID();
+
 const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
   swDest: "public/sw.js",
@@ -89,11 +91,10 @@ const withSerwist = withSerwistInit({
   // La página /offline es el respaldo de navegación sin red (F9.B1/D-35). Las
   // páginas del App Router no entran solas al precache, así que sin esto el
   // fallback nunca encontraba la página. La revisión cambia en cada build.
+  // El logo de esa pantalla también, porque public/ no entra solo al precache.
   additionalPrecacheEntries: [
-    {
-      url: "/offline",
-      revision: process.env.RAILWAY_GIT_COMMIT_SHA ?? randomUUID(),
-    },
+    { url: "/offline", revision: PRECACHE_REVISION },
+    { url: "/icons/icon-512.png", revision: PRECACHE_REVISION },
   ],
 });
 
