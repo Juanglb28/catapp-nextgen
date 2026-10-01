@@ -62,3 +62,7 @@ public/swe-worker-*.js
 
 # Playwright auth state (contiene cookies de sesión reales)
 e2e/.auth/
+
+# Material de diseño/demos de referencia (no forman parte de la app)
+/Assets/catapp-birthday-gift-component/
+/public/birthday-gift-demos.html
