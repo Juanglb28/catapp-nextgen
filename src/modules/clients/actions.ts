@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import type { ActionResult } from "@/lib/action-result";
+import { getPgError } from "@/lib/pg-error";
 import { normalizePhone } from "@/lib/phone";
 import { swallow } from "@/lib/swallow";
 import {
@@ -32,13 +33,8 @@ import { clientFormSchema } from "./validation";
 
 /** Detecta una violación de unique constraint de PostgreSQL (código 23505). */
 function isDuplicatePhone(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const e = error as Record<string, unknown>;
-  return (
-    e["code"] === "23505" &&
-    typeof e["constraint"] === "string" &&
-    e["constraint"].includes("phone")
-  );
+  const pg = getPgError(error);
+  return pg?.code === "23505" && (pg.constraint?.includes("phone") ?? false);
 }
 
 /** Entrada mínima para importar un contacto de Google. */

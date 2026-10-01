@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { getPgError } from "@/lib/pg-error";
 import { appointments } from "@/modules/appointments/schema";
 
 import { type Client, clients } from "./schema";
@@ -172,12 +173,7 @@ export async function deleteClient(
       .where(and(eq(clients.tenantId, tenantId), eq(clients.id, id)));
     return (result.rowCount ?? 0) > 0;
   } catch (e) {
-    if (
-      typeof e === "object" &&
-      e !== null &&
-      "code" in e &&
-      (e as { code?: string }).code === "23503"
-    ) {
+    if (getPgError(e)?.code === "23503") {
       return false; // tiene citas: no se puede borrar, hay que archivar
     }
     throw e;
