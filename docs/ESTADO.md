@@ -1,7 +1,7 @@
 # Estado del proyecto — CatApp-NextGen
 
 > Fuente de verdad del progreso. Se actualiza al cerrar cada bloque (ver Quality Gate, sección 6 del plan).
-> Última actualización: 2026-07-27.
+> Última actualización: 2026-10-01.
 
 ## Modernización CatApp-NextGen (fork de CatApp @ 14c4167)
 
@@ -242,6 +242,41 @@ Sin esto, `pnpm test` falla con `column "declined_from_status" of relation "birt
 **Limitaciones aceptadas (fase 1):** (1) es un control de acceso local, no cifrado: alguien con acceso técnico al teléfono desbloqueado (DevTools) podría leer la caché — el cifrado de datos offline queda como mejora futura; (2) la huella offline confía en la verificación del sistema operativo (no se valida la firma contra el servidor); (3) tras cambiar la contraseña desde otro dispositivo, la anterior sigue sirviendo offline en este teléfono hasta el próximo inicio de sesión o desbloqueo con contraseña en línea; (4) los botones de crear/editar siguen visibles sin red: al tocarlos lleva a `/offline` o la acción falla sin perder lo escrito (D-12); (5) si el teléfono no tiene huella registrada y la sesión se inició con Google, no hay forma de desbloquear offline (la pantalla lo explica).
 
 **Verificado en la máquina de Juan (2026-09-26):** todos los tests en verde. **Prueba en teléfono real (Android, staging, 2026-09-26): OK** — desbloqueo sin red, agenda/detalle/clientas en solo consulta, Finanzas/Ajustes/Cumpleaños/Nueva cita → pantalla Atardecer sin mostrar su contenido, botón de vuelta a la agenda. **Desplegado a producción el 2026-09-26** (merge de `feat/offline-d35` a `main`, commit `0ae89f1`); staging vuelve a desplegar desde `main`. Nota: para probar en staging hay que abrir su URL en Chrome (el ícono instalado de CatApp abre catapp.beauty, producción).
+
+### 🎉 Mejora — Celebración al abrir el regalo de cumpleaños (2026-10-01, sobre D-30)
+
+**Pedido por Juan:** hacer más vistosa la apertura del regalo en la pantalla pública de cumpleaños, y luego una ronda de ajustes visuales tras probarla en su teléfono.
+
+**Cambio:**
+
+- `src/app/(public)/cumpleanos/[token]/gift-reveal.tsx`: al tocar la caja aparece el ícono de CatApp (`public/Icon_S.png`, nuevo en el repo) con una entrada animada, más una decoración festiva (4 globos, 3 corazones y 7 estrellas alrededor del gato), un destello y un rastro de huellas. Confeti más abundante y duradero (42 piezas) y la fase de apertura dura 3,45 s. Encabezado "CatApp / Belleza en tus manos" y una atmósfera de fondo con orbes animados y estrellas.
+- Ajustes tras la prueba en teléfono: gato centrado (el `-50%` se aplicaba dos veces, por la clase `-translate-x-1/2` y por el keyframe), caja 30% más grande, título y slogan ~2 px más grandes, emojis y confeti 30% más grandes, y la escena cubre todo el viewport (`fixed inset-0`) en vez de quedar como un rectángulo dentro del layout público.
+- Pantalla completa durante la animación: al tocar la caja se pide `requestFullscreen` (oculta la barra de URL) y se sale al revelar la selección. En iOS Safari no existe para páginas web: se ignora y la animación se ve igual, con la barra visible.
+- `src/app/globals.css`: las clases `birthday-*` y sus keyframes viven junto a los `gift-*` (no en `<style jsx>`), para que estén desde el primer render del servidor.
+- Respeta `prefers-reduced-motion` igual que antes (salta directo a la selección).
+- Sin cambios de backend, esquema ni lógica de elección del regalo.
+
+**Recordatorio de flujo (confirmado con Juan):** la caja solo aparece si el bono está `approved` **y** el negocio tiene al menos una opción activa en Ajustes → Bono de cumpleaños (D-19). Sin opciones, la pantalla muestra "Tu regalo está siendo preparado" con la firma del negocio. Un negocio nuevo en la base local no tiene opciones hasta configurarlas.
+
+**Verificado en la máquina de Juan (2026-10-01):** `pnpm lint` y `pnpm build` en verde, prueba en teléfono real (Android) en local y en producción: OK. Desplegado a producción el 2026-10-01.
+
+### 🐛 Fix — Errores de Postgres envueltos por Drizzle en clientas (2026-10-01)
+
+**Causa raíz:** desde drizzle-orm 0.44 los fallos de query llegan como `DrizzleQueryError`, con el error original de `pg` en `cause`. El código revisaba `error.code` en el nivel superior, así que dejó de reconocer:
+
+- teléfono duplicado (`23505`, índice `clients_tenant_phone_unique`) al crear/editar/importar una clienta → error 500 en vez de "Ya existe una clienta con ese teléfono.";
+- borrar una clienta con citas (`23503`, llave foránea) → error 500 en vez de devolver `false` (hay que archivarla).
+
+**Cambio:** helper nuevo `src/lib/pg-error.ts` (`getPgError`) que revisa el error y su `cause`; lo usan `isDuplicatePhone` (`clients/actions.ts`) y `deleteClient` (`clients/repository.ts`). Si se agregan más chequeos de códigos de Postgres, usar este helper.
+
+**Verificado en la máquina de Juan (2026-10-01):** `pnpm lint` y `pnpm build` en verde; crear una clienta con teléfono repetido muestra el mensaje esperado.
+
+### 🧹 Mantenimiento (2026-10-01)
+
+- Favicon duplicado: se borró `public/favicon.ico` (idéntico a `src/app/favicon.ico`); Next.js respondía 500 en `/favicon.ico` por el conflicto.
+- `.gitignore`: se excluyen material de diseño/demos y archivos locales de prueba (`Assets/catapp-birthday-gift-component/`, `public/birthday-gift-demos.html`, etc.).
+- `eslint.config.mjs`: se ignora `Assets/**` (ESLint no usa `.gitignore`).
+- **Notas de entorno local:** `BETTER_AUTH_TRUSTED_ORIGINS` debe incluir la IP actual del PC en la red para probar desde el celular (403 "Invalid origin" si cambia); después de bajar cambios, correr `pnpm db:migrate` sobre la base local; no correr `pnpm build` con `pnpm dev` abierto (comparten `.next`).
 
 ### Sistema de bonos de cumpleaños — detalle
 
