@@ -514,7 +514,7 @@
   z-index: 1;
   width: 100%;
   color: rgb(240 171 252 / 0.67);
-  font-size: 1.35rem;
+  font-size: 1.755rem;
   letter-spacing: 1.4rem;
   text-align: center;
   pointer-events: none;
@@ -523,44 +523,19 @@
 .birthday-symbol {
   position: absolute;
   z-index: 15;
-  font-size: 1.69rem;
+  font-size: 2.2rem;
   font-style: normal;
   opacity: 0;
   animation: birthday-pop-symbol 0.72s cubic-bezier(0.15, 0.9, 0.25, 1) forwards;
-}
-.birthday-cake {
-  top: 39%;
-  left: 12%;
-  animation-delay: 0.1s;
-}
-.birthday-heart {
-  top: 42%;
-  right: 10%;
-  animation-delay: 0.18s;
-}
-.birthday-star {
-  top: 22%;
-  left: 18%;
-  animation-delay: 0.25s;
-}
-.birthday-balloon {
-  top: 27%;
-  right: 17%;
-  animation-delay: 0.33s;
-}
-.birthday-sparkle {
-  top: 40%;
-  left: 43%;
-  animation-delay: 0.14s;
 }
 
 .birthday-spark {
   position: absolute;
   top: 45%;
-  left: calc(50% - 27px);
+  left: calc(50% - 35px);
   z-index: 15;
   color: #fef08a;
-  font-size: 3.75rem;
+  font-size: 4.875rem;
   opacity: 0;
   animation: birthday-spark 0.7s ease-out forwards;
 }
@@ -568,7 +543,7 @@
 .birthday-paw-trail span {
   position: absolute;
   z-index: 15;
-  font-size: 1.82rem;
+  font-size: 2.37rem;
   font-style: normal;
   opacity: 0;
   filter: brightness(0.52) saturate(0.9) contrast(1.15);
@@ -615,14 +590,16 @@
     transform: translate(42px, -37px) scale(1.2);
   }
 }
+/* El centrado horizontal lo da la clase -translate-x-1/2 (propiedad `translate`),
+   que se suma a `transform`: aquí no se repite el -50% o el gato queda corrido. */
 @keyframes gift-cat-arrival {
   from {
     opacity: 0;
-    transform: translate(-50%, 18px) scale(0.82);
+    transform: translateY(18px) scale(0.82);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 @keyframes birthday-pop-symbol {
