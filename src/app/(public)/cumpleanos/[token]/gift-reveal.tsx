@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   useEffect,
   useRef,
@@ -43,13 +44,13 @@ function randomColor(): string {
 function buildConfetti(count: number): ConfettiPiece[] {
   return Array.from({ length: count }, (_, i) => ({
     id: i,
-    gx: Math.round((Math.random() - 0.5) * 260),
-    gy: Math.round(90 + Math.random() * 160),
+    gx: Math.round((Math.random() - 0.5) * 360),
+    gy: Math.round(110 + Math.random() * 250),
     grot: Math.round(
       (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 420),
     ),
-    delay: Math.round(Math.random() * 150),
-    duration: Math.round(900 + Math.random() * 500),
+    delay: Math.round(Math.random() * 400),
+    duration: Math.round(1200 + Math.random() * 1500),
     color: randomColor(),
     size: Math.random() > 0.5 ? 8 : 5,
     round: Math.random() > 0.5,
@@ -84,31 +85,44 @@ export function GiftReveal({ children }: { children: ReactNode }) {
       setPhase("open");
       return;
     }
-    setConfetti(buildConfetti(28));
+    setConfetti(buildConfetti(42));
     setPhase("opening");
-    timeoutRef.current = setTimeout(() => setPhase("open"), 1000);
+    timeoutRef.current = setTimeout(() => setPhase("open"), 3450);
   }
 
   if (phase === "open") {
     return (
-      <div className="animate-gift-fade-in flex flex-1 flex-col">
-        {children}
+      <div className="relative flex min-h-[calc(100dvh-4rem)] flex-1 flex-col overflow-hidden">
+        <GiftAtmosphere />
+        <div className="animate-gift-fade-in relative z-10 flex flex-1 flex-col">
+          {children}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
-      <div className="space-y-1">
-        <p className="text-lg font-bold tracking-wide text-white">Cat App</p>
-        <p className="text-xs text-white/60">Belleza en tus manos</p>
+    <div className="relative flex min-h-[calc(100dvh-4rem)] flex-1 flex-col overflow-hidden px-6 text-center">
+      <GiftAtmosphere />
+      <div className="absolute top-16 left-0 z-20 w-full space-y-1">
+        <p className="text-[1.7rem] font-extrabold leading-none tracking-[-.06em] text-white">CatApp</p>
+        <p className="text-[.96rem] text-pink-100/80">Belleza en tus manos</p>
       </div>
+
+      {phase === "opening" && (
+        <>
+          <div className="absolute top-[36%] left-1/2 z-20 size-48 -translate-x-1/2 animate-[gift-cat-arrival_.68s_cubic-bezier(.16,.9,.25,1)_.34s_both] drop-shadow-[0_10px_14px_rgba(17,0,32,.53)]">
+            <Image src="/Icon_S.png" alt="" width={192} height={192} priority className="size-full object-contain" />
+          </div>
+          <CelebrationDecor />
+        </>
+      )}
 
       <button
         type="button"
         onClick={handleOpen}
         aria-label="Toca para abrir tu regalo"
-        className="relative w-40 rounded-2xl border-0 bg-transparent p-0 focus-visible:ring-4 focus-visible:ring-pink-300/60 focus-visible:outline-none"
+        className="absolute bottom-12 left-1/2 z-10 w-40 -translate-x-1/2 rounded-2xl border-0 bg-transparent p-0 focus-visible:ring-4 focus-visible:ring-pink-300/60 focus-visible:outline-none"
       >
         {confetti.map((c) => (
           <span
@@ -134,10 +148,57 @@ export function GiftReveal({ children }: { children: ReactNode }) {
       </button>
 
       {phase === "closed" && (
-        <p className="text-sm font-medium text-white/80">
+        <p className="absolute bottom-4 left-0 z-20 w-full text-sm font-medium text-white/80 animate-pulse">
           Toca para abrir tu regalo
         </p>
       )}
+    </div>
+  );
+}
+
+function GiftAtmosphere() {
+  return (
+    <>
+      <div aria-hidden className="birthday-gift-orb birthday-gift-orb-one" />
+      <div aria-hidden className="birthday-gift-orb birthday-gift-orb-two" />
+      <div aria-hidden className="birthday-gift-stars">✦　·　✦　·　✦</div>
+      <style jsx global>{`
+        .birthday-gift-orb { position: absolute; z-index: 0; border-radius: 9999px; filter: blur(20px); pointer-events: none; }
+        .birthday-gift-orb-one { top: -95px; right: -95px; width: 230px; height: 230px; background: #a855f7; opacity: .7; animation: birthday-orb-one 12s ease-in-out infinite alternate; }
+        .birthday-gift-orb-two { bottom: -80px; left: -90px; width: 200px; height: 200px; background: #ec4899; opacity: .35; animation: birthday-orb-two 15s ease-in-out infinite alternate; }
+        .birthday-gift-stars { position: absolute; top: 48px; z-index: 1; width: 100%; color: rgb(240 171 252 / .67); font-size: 1.35rem; letter-spacing: 1.4rem; text-align: center; pointer-events: none; }
+        @keyframes birthday-orb-one { to { transform: translate(-28px, 46px) scale(1.16); } }
+        @keyframes birthday-orb-two { to { transform: translate(42px, -37px) scale(1.2); } }
+        @keyframes gift-cat-arrival { from { opacity: 0; transform: translate(-50%, 18px) scale(.82); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+      `}</style>
+    </>
+  );
+}
+
+function CelebrationDecor() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-15">
+      <span className="birthday-symbol birthday-cake">🎂</span>
+      <span className="birthday-symbol birthday-heart">💗</span>
+      <span className="birthday-symbol birthday-star">✦</span>
+      <span className="birthday-symbol birthday-balloon">🎈</span>
+      <span className="birthday-symbol birthday-sparkle">✨</span>
+      <span className="birthday-spark">✦</span>
+      <div className="birthday-paw-trail">
+        {Array.from({ length: 6 }, (_, index) => (
+          <span key={index}>🐾</span>
+        ))}
+      </div>
+      <style jsx global>{`
+        .birthday-symbol { position: absolute; z-index: 15; font-size: 1.69rem; font-style: normal; opacity: 0; animation: birthday-pop-symbol .72s cubic-bezier(.15,.9,.25,1) forwards; }
+        .birthday-cake { top: 39%; left: 12%; animation-delay: .1s; }.birthday-heart { top: 42%; right: 10%; animation-delay: .18s; }.birthday-star { top: 22%; left: 18%; animation-delay: .25s; }.birthday-balloon { top: 27%; right: 17%; animation-delay: .33s; }.birthday-sparkle { top: 40%; left: 43%; animation-delay: .14s; }
+        .birthday-spark { position: absolute; top: 45%; left: calc(50% - 27px); z-index: 15; color: #fef08a; font-size: 3.75rem; opacity: 0; animation: birthday-spark .7s ease-out forwards; }
+        .birthday-paw-trail span { position: absolute; z-index: 15; font-size: 1.82rem; font-style: normal; opacity: 0; filter: brightness(.52) saturate(.9) contrast(1.15); animation: birthday-paw-rise .48s ease-out forwards; }
+        .birthday-paw-trail span:nth-child(1) { bottom: 12%; left: 47%; animation-delay: .05s; }.birthday-paw-trail span:nth-child(2) { bottom: 16%; left: 55%; animation-delay: .13s; }.birthday-paw-trail span:nth-child(3) { bottom: 20%; left: 48%; animation-delay: .21s; }.birthday-paw-trail span:nth-child(4) { bottom: 24%; left: 55%; animation-delay: .29s; }.birthday-paw-trail span:nth-child(5) { bottom: 28%; left: 49%; animation-delay: .37s; }.birthday-paw-trail span:nth-child(6) { bottom: 32%; left: 53%; animation-delay: .45s; }
+        @keyframes birthday-pop-symbol { 0% { opacity: 0; transform: scale(.2) rotate(-25deg); } 65% { opacity: 1; transform: scale(1.18) rotate(10deg); } 100% { opacity: .92; transform: scale(1) rotate(0); } }
+        @keyframes birthday-spark { 40% { opacity: 1; transform: scale(1.5); } 100% { opacity: 0; transform: scale(2.2); } }
+        @keyframes birthday-paw-rise { to { opacity: .9; transform: scale(1) rotate(-15deg); } }
+      `}</style>
     </div>
   );
 }
