@@ -25,6 +25,8 @@ const eslintConfig = [
       // E2E (Playwright) tiene su propio runner; fuera del lint de la app.
       "e2e/**",
       "playwright.config.ts",
+      // Material de diseño/referencia local (ignorado en .gitignore), no es código de la app.
+      "Assets/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
