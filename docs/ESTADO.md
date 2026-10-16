@@ -220,7 +220,7 @@ Sin esto, `pnpm test` falla con `column "declined_from_status" of relation "birt
 
 **Verificado en la máquina de Juan (2026-09-20):** lint, typecheck, tests unitarios y de integración en verde. Nota: los tests de integración comparten una sola DB y deben correr en serie; lanzar dos comandos vitest a la vez produce fallos de llave foránea espurios.
 
-**Operativo:** servicio `cron-overdue-payments` creado en producción (`Project_Independency_CatApp`, imagen `node:22-alpine`, `CRON_SECRET` referenciado, Restart Policy Never, schedule `0 13 * * *`); config verificada. **Pendiente:** prueba con "Run now" tras desplegar D-33 y confirmar `status 200` (receta en `docs/CRONS.md`).
+**Operativo — verificado 2026-10-16:** servicio `cron-overdue-payments` creado en producción (`Project_Independency_CatApp`, imagen `node:22-alpine`, `CRON_SECRET` referenciado, Restart Policy Never, schedule `0 13 * * *`). Al revisar el historial de corridas se confirmó que el cron **lleva funcionando solo, sin intervención, todos los días desde el 1 de octubre** (8 AM Bogotá), con `status 200 {"ok":true,...}` en cada una — incluida la del propio 16 de octubre (`{"tenantsWithOverdue":2,"notified":2}`). No hubo que esperar a una prueba manual: el historial ya era la prueba. Corrida manual adicional ese mismo día (`redeploy` del servicio vía MCP de Railway, equivalente a "Run now") también en `SUCCESS`. Confirmado además en la app: la tab "Pendientes" de `/citas` muestra correctamente una cita vieja sin cobrar (Noreley Molina, 14 oct, $68.000), coherente con lo que el cron está notificando. **D-32/D-33/D-34 cerrados end-to-end.**
 
 ### 📴 Feature — Modo offline de solo consulta, fase inicial (2026-09-25, D-35)
 
