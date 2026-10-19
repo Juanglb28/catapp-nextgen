@@ -266,9 +266,23 @@ export function RegisterPaymentSheet({
       <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent side="bottom">
         <SheetHeader>
-          <SheetTitle>
-            {isAdjust ? "Ajustar pago" : "Registrar pago"}
-          </SheetTitle>
+          <div className="flex items-start justify-between gap-3 pr-6">
+            <SheetTitle>
+              {isAdjust ? "Ajustar pago" : "Registrar pago"}
+            </SheetTitle>
+            {/* Referencia para repartir Efectivo/Transferencia en "Ambos" (D-36):
+                no se autocompleta nada, solo recuerda cuánto falta por cobrar. */}
+            {!isAdjust ? (
+              <div className="text-right">
+                <p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                  Pendiente por cobrar
+                </p>
+                <p className="text-sm font-medium text-amber-700">
+                  {formatCOP(defaultAmount)}
+                </p>
+              </div>
+            ) : null}
+          </div>
           <SheetDescription>
             {isAdjust
               ? "Corrige el monto pagado al valor exacto."
