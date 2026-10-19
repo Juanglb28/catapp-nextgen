@@ -146,7 +146,10 @@ export function RegisterPaymentSheet({
       setCash(0);
       setTransfer(defaultAmount);
     } else if (next === "ambos") {
-      setCash(defaultAmount);
+      // Sin precarga: el usuario ingresa ambos montos a mano para evitar que
+      // la suma por defecto (efectivo = total) supere el pendiente al sumar
+      // la transferencia.
+      setCash(0);
       setTransfer(0);
     }
   }
