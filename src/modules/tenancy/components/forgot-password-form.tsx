@@ -17,16 +17,25 @@ export function ForgotPasswordForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("loading");
-    // reCAPTCHA v3: token verificado en el servidor por Better Auth (si activo).
-    const captchaToken = await getRecaptchaToken("reset");
-    const { error } = await authClient.requestPasswordReset({
-      email,
-      redirectTo: "/nueva-contrasena",
-      ...(captchaToken
-        ? { fetchOptions: { headers: { "x-captcha-response": captchaToken } } }
-        : {}),
-    });
-    setStatus(error ? "error" : "sent");
+    try {
+      // reCAPTCHA v3: token verificado en el servidor por Better Auth (si activo).
+      const captchaToken = await getRecaptchaToken("reset");
+      const { error } = await authClient.requestPasswordReset({
+        email,
+        redirectTo: "/nueva-contrasena",
+        ...(captchaToken
+          ? {
+              fetchOptions: { headers: { "x-captcha-response": captchaToken } },
+            }
+          : {}),
+      });
+      setStatus(error ? "error" : "sent");
+    } catch {
+      // Sin esto, un fallo de red (p. ej. el fetch rechazado dentro del
+      // service worker) dejaba el botón en "Enviando…" para siempre: nunca se
+      // llegaba a `setStatus`, porque el error no estaba contenido.
+      setStatus("error");
+    }
   }
 
   if (status === "sent") {

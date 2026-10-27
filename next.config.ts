@@ -13,7 +13,10 @@ import type { NextConfig } from "next";
  *  - `script-src 'unsafe-eval'`: webpack dev source maps AND reCAPTCHA v3, que
  *    lo usa para su scoring. Relajación pequeña ('unsafe-inline' ya está puesto).
  *  - `style-src 'unsafe-inline'`: Tailwind v4 injects inline styles.
- *  - `connect-src 'self' *.sentry.io`: Sentry SDK sends events to sentry.io.
+ *  - `connect-src 'self' *.sentry.io https://www.google.com
+ *    https://www.gstatic.com`: Sentry SDK sends events to sentry.io;
+ *    reCAPTCHA v3 fetches locale resources (e.g. recaptcha__en.js) from
+ *    gstatic.com, not just google.com.
  *  - `worker-src 'self'`: Serwist service worker.
  *  - `frame-ancestors 'none'`: equivalent to X-Frame-Options DENY.
  */
@@ -51,7 +54,14 @@ const securityHeaders = [
       "img-src 'self' data: blob:",
       "font-src 'self'",
       // Sentry SDK sends error events to ingest.sentry.io; reCAPTCHA valida en google.com.
-      "connect-src 'self' *.sentry.io https://www.google.com",
+      // gstatic.com: reCAPTCHA v3 carga su recurso de idioma (p. ej.
+      // recaptcha__en.js) con fetch(), lo que cae bajo connect-src (no
+      // script-src). Sin esto, el fetch se bloquea en silencio y
+      // `grecaptcha.ready()` nunca llama a su callback — el formulario que
+      // pide el token de captcha (registro, recuperar contraseña) se queda
+      // colgado para siempre. Reproducido en Android/iOS reales; no se veía
+      // en escritorio porque ese código de idioma no se disparaba ahí.
+      "connect-src 'self' *.sentry.io https://www.google.com https://www.gstatic.com",
       // Serwist service worker.
       "worker-src 'self'",
       // Disallow plugins (Flash, etc.).

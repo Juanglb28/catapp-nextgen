@@ -22,16 +22,24 @@ export function ResetPasswordForm({ token }: { token: string }) {
       return;
     }
     setStatus("loading");
-    const { error } = await authClient.resetPassword({
-      newPassword: password,
-      token,
-    });
-    if (error) {
-      setErrorMsg("El enlace es inválido o ya expiró. Solicita uno nuevo.");
+    try {
+      const { error } = await authClient.resetPassword({
+        newPassword: password,
+        token,
+      });
+      if (error) {
+        setErrorMsg("El enlace es inválido o ya expiró. Solicita uno nuevo.");
+        setStatus("error");
+        return;
+      }
+      router.push("/login?reset=ok");
+    } catch {
+      // Igual que en forgot-password-form: sin este catch, un fallo de red
+      // (fetch rechazado, p. ej. por el service worker) dejaba el botón en
+      // "Guardando…" para siempre en vez de mostrar un error.
+      setErrorMsg("Ocurrió un error de conexión. Inténtalo de nuevo.");
       setStatus("error");
-      return;
     }
-    router.push("/login?reset=ok");
   }
 
   return (
