@@ -119,17 +119,26 @@ export default async function CitaDetailPage({
   const serviceLineById = new Map(
     appointment.services.map((line) => [line.serviceId, line]),
   );
-  const peopleBreakdown = appointment.people.map((person) => ({
-    name: person.name,
-    services: person.serviceIds
+  const peopleBreakdown = appointment.people.map((person) => {
+    const lines = person.serviceIds
       .map((serviceId) => serviceLineById.get(serviceId))
-      .filter((line): line is NonNullable<typeof line> => line !== undefined)
-      .map((line) => ({
+      .filter((line): line is NonNullable<typeof line> => line !== undefined);
+    return {
+      name: person.name,
+      // Cada persona recibe UNA unidad de cada servicio (PK person_id +
+      // service_id), así que se muestra el precio UNITARIO sin "×N" — la
+      // cantidad de la línea es la de toda la cita, no la de la persona
+      // (D-40). El total de la cita queda en la sección de totales.
+      services: lines.map((line) => ({
         name: line.service.name,
-        quantity: line.quantity,
-        amount: formatCOP(line.priceCop * BigInt(line.quantity)),
+        quantity: 1,
+        amount: formatCOP(line.priceCop),
       })),
-  }));
+      // Subtotal por persona (D-40): suma de sus precios unitarios. Es
+      // informativo — bono/ajustes del total se aplican solo a nivel cita.
+      subtotal: formatCOP(lines.reduce((sum, l) => sum + l.priceCop, 0n)),
+    };
+  });
 
   // Opciones del sheet de servicios: catálogo activo + los de la cita (precio
   // congelado) que ya no estén activos.
@@ -519,6 +528,10 @@ export default async function CitaDetailPage({
                     </li>
                   ))}
                 </ul>
+                <div className="mt-1 flex items-center justify-between border-t pt-1 text-xs font-medium">
+                  <span>Subtotal</span>
+                  <span>{person.subtotal}</span>
+                </div>
               </li>
             ))}
           </ul>

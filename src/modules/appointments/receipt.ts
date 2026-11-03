@@ -35,7 +35,12 @@ export type ReceiptData = {
    * de `services`. Cuando viene con datos, se renderiza agrupado por
    * persona EN LUGAR de la lista plana, para no duplicar los servicios.
    */
-  people?: { name: string; services: ReceiptService[] }[];
+  people?: {
+    name: string;
+    services: ReceiptService[];
+    /** Subtotal ya formateado de la persona (D-40). Si se omite, no se dibuja. */
+    subtotal?: string;
+  }[];
   /** Montos ya formateados (es-CO). Los `*Label` opcionales se omiten si null. */
   totalLabel: string;
   bonusLabel: string | null;
@@ -226,6 +231,23 @@ export function buildReceiptSvg(data: ReceiptData): string {
           body.push(text(M + 12, y, name, { size: 20 }));
           body.push(
             text(RIGHT, y, s.amount, { size: 20, weight: 600, anchor: "end" }),
+          );
+        }
+        if (person.subtotal) {
+          y += 32;
+          body.push(
+            text(M + 12, y, "Subtotal", {
+              size: 18,
+              weight: 700,
+              color: COLOR.muted,
+            }),
+          );
+          body.push(
+            text(RIGHT, y, person.subtotal, {
+              size: 20,
+              weight: 700,
+              anchor: "end",
+            }),
           );
         }
         y += 38;

@@ -137,6 +137,37 @@ describe("buildReceiptSvg", () => {
     expect(svg).not.toContain("SERVICIOS");
   });
 
+  it("con subtotal por persona: lo dibuja bajo los servicios de cada una (D-40)", () => {
+    const svg = buildReceiptSvg({
+      ...paid,
+      people: [
+        {
+          name: "Ana",
+          services: [
+            { name: "Manicure", quantity: 1, amount: "$25.000" },
+            { name: "Pedicure", quantity: 1, amount: "$35.000" },
+          ],
+          subtotal: "$60.000",
+        },
+      ],
+    });
+    expect(svg).toContain("Subtotal");
+    expect(svg).toContain("$60.000");
+  });
+
+  it("sin subtotal: no dibuja la fila de subtotal", () => {
+    const svg = buildReceiptSvg({
+      ...paid,
+      people: [
+        {
+          name: "Ana",
+          services: [{ name: "Manicure", quantity: 1, amount: "$25.000" }],
+        },
+      ],
+    });
+    expect(svg).not.toContain("Subtotal");
+  });
+
   it("sin desglose guardado (citas viejas): se ve igual que antes, sin cambios", () => {
     // `paid` no define `people` — simula una cita creada antes de D-38.
     const svg = buildReceiptSvg(paid);
