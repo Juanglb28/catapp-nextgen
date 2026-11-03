@@ -30,8 +30,11 @@ import {
 import {
   type Appointment,
   type AppointmentChange,
+  type AppointmentPerson,
   type AppointmentService,
   appointmentChanges,
+  appointmentPeople,
+  appointmentPersonServices,
   appointmentServices,
   appointments,
 } from "./schema";
@@ -50,21 +53,32 @@ export type ServiceLineInput = {
   quantity?: number;
 };
 
+/** Una persona atendida y los servicios (por id) que recibió. */
+export type PersonInput = { name: string; serviceIds: string[] };
+
 export type CreateAppointmentInput = {
   clientId: string;
   startsAt: Date;
   endsAt: Date;
   services: ServiceLineInput[];
   peopleCount?: number;
+  /** Desglose por persona (comprobante discriminado). Ver `PersonInput`. */
+  people?: PersonInput[];
   notes?: string | null;
   /** Override manual del total (negociación en vivo). Si no, se calcula. */
   totalOverride?: bigint | null;
   status?: AppointmentStatus;
 };
 
+export type AppointmentPersonDetails = AppointmentPerson & {
+  serviceIds: string[];
+};
+
 export type AppointmentDetails = Appointment & {
   client: Client;
   services: (AppointmentService & { service: Service })[];
+  /** Desglose por persona (comprobante discriminado). Vacío si no aplica. */
+  people: AppointmentPersonDetails[];
 };
 
 /** Crea la cita y sus servicios en una transacción. */
@@ -122,6 +136,34 @@ export async function createAppointment(
       );
     }
 
+    // Desglose por persona (comprobante discriminado, ítem nuevo). Solo si
+    // vino gente (peopleCount > 1 en el formulario); con 1 persona no se
+    // guarda nada aquí.
+    if (data.people && data.people.length > 0) {
+      const insertedPeople = await tx
+        .insert(appointmentPeople)
+        .values(
+          data.people.map((p, i) => ({
+            appointmentId: appointment.id,
+            name: p.name,
+            orderIndex: i,
+          })),
+        )
+        .returning();
+
+      const personServiceRows = insertedPeople.flatMap((person, i) =>
+        data.people![i].serviceIds.map((serviceId) => ({
+          appointmentId: appointment.id,
+          personId: person.id,
+          serviceId,
+          quantity: 1,
+        })),
+      );
+      if (personServiceRows.length > 0) {
+        await tx.insert(appointmentPersonServices).values(personServiceRows);
+      }
+    }
+
     return appointment;
   });
 }
@@ -150,10 +192,30 @@ export async function getAppointment(
     .innerJoin(services, eq(services.id, appointmentServices.serviceId))
     .where(eq(appointmentServices.appointmentId, id));
 
+  // Desglose por persona (comprobante discriminado, ítem nuevo). La mayoría
+  // de citas (1 persona) no tiene filas aquí.
+  const people = await db
+    .select()
+    .from(appointmentPeople)
+    .where(eq(appointmentPeople.appointmentId, id))
+    .orderBy(asc(appointmentPeople.orderIndex));
+  const personServiceRows = people.length
+    ? await db
+        .select()
+        .from(appointmentPersonServices)
+        .where(eq(appointmentPersonServices.appointmentId, id))
+    : [];
+
   return {
     ...appointment,
     client,
     services: lines.map((r) => ({ ...r.line, service: r.service })),
+    people: people.map((p) => ({
+      ...p,
+      serviceIds: personServiceRows
+        .filter((r) => r.personId === p.id)
+        .map((r) => r.serviceId),
+    })),
   };
 }
 
@@ -497,6 +559,13 @@ export async function updateAppointment(
       await tx
         .delete(appointmentServices)
         .where(eq(appointmentServices.appointmentId, id));
+      // Desglose por persona (comprobante discriminado): se borra al editar
+      // los servicios, porque ya no hay garantía de que siga correspondiendo
+      // con la lista nueva (ver comentario en schema.ts). `onDelete: cascade`
+      // en appointment_person_services.person_id se encarga de esas filas.
+      await tx
+        .delete(appointmentPeople)
+        .where(eq(appointmentPeople.appointmentId, id));
       if (lines.length > 0) {
         await tx.insert(appointmentServices).values(
           lines.map((l) => ({

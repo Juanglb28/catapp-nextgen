@@ -99,6 +99,23 @@ export async function createAppointmentAction(
     });
   }
 
+  // Desglose por persona (comprobante discriminado, ítem nuevo): cada
+  // serviceId debe existir en el catálogo igual que arriba (aislamiento).
+  let people: { name: string; serviceIds: string[] }[] | undefined;
+  if (data.people) {
+    for (const p of data.people) {
+      for (const sid of p.serviceIds) {
+        if (!byId.has(sid)) {
+          return {
+            ok: false,
+            error: "Uno de los servicios ya no está disponible.",
+          };
+        }
+      }
+    }
+    people = data.people;
+  }
+
   // Anti-duplicado (bloqueante, NO se puede forzar): misma clienta a la misma
   // hora exacta ya tiene una cita activa. Distinto del solape de más abajo.
   const duplicate = await findDuplicateForClient(
@@ -140,6 +157,7 @@ export async function createAppointmentAction(
     endsAt,
     services: lines,
     peopleCount: data.peopleCount,
+    people,
     notes: data.notes === "" ? null : data.notes,
     totalOverride:
       data.totalOverride === null ? undefined : BigInt(data.totalOverride),

@@ -28,6 +28,14 @@ export type ReceiptData = {
   /** "10:00 – 11:00" ya formateado. */
   timeLabel: string;
   services: ReceiptService[];
+  /**
+   * Desglose por persona cuando la cita tuvo más de una (D-38). Si se omite
+   * o viene vacío (citas creadas antes de este cambio, sin nombres
+   * guardados), el comprobante se ve igual que antes: solo la lista plana
+   * de `services`. Cuando viene con datos, se renderiza agrupado por
+   * persona EN LUGAR de la lista plana, para no duplicar los servicios.
+   */
+  people?: { name: string; services: ReceiptService[] }[];
   /** Montos ya formateados (es-CO). Los `*Label` opcionales se omiten si null. */
   totalLabel: string;
   bonusLabel: string | null;
@@ -200,8 +208,31 @@ export function buildReceiptSvg(data: ReceiptData): string {
     );
     y += 20;
   } else {
-    // Servicios.
-    if (data.services.length > 0) {
+    // Servicios: desglosados por persona si hay más de una (D-38), si no
+    // la lista plana de siempre. Nunca se muestran ambos a la vez.
+    if (data.people && data.people.length > 0) {
+      y += 38;
+      for (const person of data.people) {
+        body.push(
+          text(M, y, person.name.toUpperCase(), {
+            size: 13,
+            weight: 700,
+            color: COLOR.muted,
+          }),
+        );
+        for (const s of person.services) {
+          y += 34;
+          const name = s.quantity > 1 ? `${s.name} ×${s.quantity}` : s.name;
+          body.push(text(M + 12, y, name, { size: 20 }));
+          body.push(
+            text(RIGHT, y, s.amount, { size: 20, weight: 600, anchor: "end" }),
+          );
+        }
+        y += 38;
+      }
+      y -= 18;
+      body.push(divider(y));
+    } else if (data.services.length > 0) {
       y += 38;
       body.push(
         text(M, y, "SERVICIOS", { size: 13, weight: 700, color: COLOR.muted }),

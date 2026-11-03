@@ -3,36 +3,66 @@ import { z } from "zod";
 /** Estado de pago inicial al crear la cita. */
 export const PAYMENT_KINDS = ["pending", "paid", "partial"] as const;
 
-export const createAppointmentFormSchema = z.object({
-  clientId: z.string().uuid({ message: "Selecciona una clienta" }),
-  services: z
-    .array(
-      z.object({
-        serviceId: z.string().uuid(),
-        quantity: z.number().int().min(1).max(50),
-      }),
-    )
-    .min(1, { message: "Agrega al menos un servicio" }),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Fecha inválida" }),
-  time: z.string().regex(/^\d{2}:\d{2}$/, { message: "Hora inválida" }),
-  durationMin: z
-    .number()
-    .int()
-    .min(1, { message: "La duración debe ser mayor a 0" })
-    .max(1440),
-  // null => usar el total calculado; número => override manual.
-  totalOverride: z.number().int().min(0).nullable(),
-  peopleCount: z.number().int().min(1).max(10),
-  notes: z.string().trim().max(2000),
-  payment: z.object({
-    kind: z.enum(PAYMENT_KINDS),
-    amount: z.number().int().min(0),
-  }),
-  /** Confirmación del usuario para crear aunque haya solape. */
-  force: z.boolean().optional(),
-  /** Invitar a la clienta por correo al evento de Google Calendar (F5.B2). */
-  inviteClient: z.boolean().optional(),
+/**
+ * Desglose por persona (comprobante discriminado, ítem nuevo). Obligatorio
+ * solo cuando `peopleCount > 1` — con 1 persona no hace falta repetir el
+ * nombre de la clienta. Cada persona necesita al menos un servicio asignado
+ * (igual que exige el formulario: "Asigna al menos un servicio a alguna
+ * persona").
+ */
+const personInputSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, { message: "Falta el nombre de una de las personas" })
+    .max(100),
+  serviceIds: z.array(z.string().uuid()).min(1),
 });
+
+export const createAppointmentFormSchema = z
+  .object({
+    clientId: z.string().uuid({ message: "Selecciona una clienta" }),
+    services: z
+      .array(
+        z.object({
+          serviceId: z.string().uuid(),
+          quantity: z.number().int().min(1).max(50),
+        }),
+      )
+      .min(1, { message: "Agrega al menos un servicio" }),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Fecha inválida" }),
+    time: z.string().regex(/^\d{2}:\d{2}$/, { message: "Hora inválida" }),
+    durationMin: z
+      .number()
+      .int()
+      .min(1, { message: "La duración debe ser mayor a 0" })
+      .max(1440),
+    // null => usar el total calculado; número => override manual.
+    totalOverride: z.number().int().min(0).nullable(),
+    peopleCount: z.number().int().min(1).max(10),
+    notes: z.string().trim().max(2000),
+    payment: z.object({
+      kind: z.enum(PAYMENT_KINDS),
+      amount: z.number().int().min(0),
+    }),
+    /** Confirmación del usuario para crear aunque haya solape. */
+    force: z.boolean().optional(),
+    /** Invitar a la clienta por correo al evento de Google Calendar (F5.B2). */
+    inviteClient: z.boolean().optional(),
+    /** Desglose por persona (comprobante discriminado). Ver `personInputSchema`. */
+    people: z.array(personInputSchema).max(10).optional(),
+  })
+  .refine(
+    (data) =>
+      data.peopleCount <= 1 ||
+      (data.people !== undefined && data.people.length === data.peopleCount),
+    {
+      message: "Falta el nombre de una de las personas",
+      path: ["people"],
+    },
+  );
 
 export type CreateAppointmentFormInput = z.infer<
   typeof createAppointmentFormSchema

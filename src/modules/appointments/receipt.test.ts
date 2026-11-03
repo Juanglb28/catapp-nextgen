@@ -113,6 +113,41 @@ describe("buildReceiptSvg", () => {
     expect(svg).not.toContain("Bono de cumpleaños");
     expect(svg).not.toContain("Saldo");
   });
+
+  // Comprobante discriminado por persona (D-38).
+  it("con desglose por persona: agrupa los servicios por persona y oculta la lista plana", () => {
+    const svg = buildReceiptSvg({
+      ...paid,
+      people: [
+        {
+          name: "Ana",
+          services: [{ name: "Manicure", quantity: 1, amount: "$50.000" }],
+        },
+        {
+          name: "María",
+          services: [{ name: "Esmaltado", quantity: 2, amount: "$40.000" }],
+        },
+      ],
+    });
+    expect(svg).toContain("ANA");
+    expect(svg).toContain("MARÍA");
+    expect(svg).toContain("Manicure");
+    expect(svg).toContain("Esmaltado ×2");
+    // La lista plana de "SERVICIOS" no se duplica cuando hay desglose.
+    expect(svg).not.toContain("SERVICIOS");
+  });
+
+  it("sin desglose guardado (citas viejas): se ve igual que antes, sin cambios", () => {
+    // `paid` no define `people` — simula una cita creada antes de D-38.
+    const svg = buildReceiptSvg(paid);
+    expect(svg).toContain("SERVICIOS");
+    expect(svg).not.toContain("ANA");
+  });
+
+  it("con desglose vacío: se comporta igual que sin desglose", () => {
+    const svg = buildReceiptSvg({ ...paid, people: [] });
+    expect(svg).toContain("SERVICIOS");
+  });
 });
 
 describe("buildReceiptShareText", () => {

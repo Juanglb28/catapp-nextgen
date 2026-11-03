@@ -37,7 +37,12 @@ type ServiceOption = {
 };
 type PaymentKind = "pending" | "paid" | "partial";
 
-/** Una persona atendida: nombre opcional y los servicios que recibe. */
+/**
+ * Una persona atendida y los servicios que recibe. El nombre solo es
+ * obligatorio cuando hay más de una persona (comprobante discriminado,
+ * D-38) — con una sola persona el nombre de la clienta ya es la fuente
+ * de verdad, así que no hace falta repetirlo.
+ */
 type PersonRow = { id: string; name: string; serviceIds: string[] };
 
 function newPerson(): PersonRow {
@@ -187,6 +192,19 @@ export function AppointmentForm({
       setError("Asigna al menos un servicio a alguna persona.");
       return;
     }
+    // Nombre y al menos un servicio por persona, cuando hay más de una
+    // (comprobante discriminado, ítem nuevo): con 1 persona no hace falta
+    // repetir el nombre de la clienta.
+    if (persons.length > 1) {
+      if (persons.some((p) => p.name.trim() === "")) {
+        setError("Escribe el nombre de cada persona atendida.");
+        return;
+      }
+      if (persons.some((p) => p.serviceIds.length === 0)) {
+        setError("Asigna al menos un servicio a cada persona, o quítala.");
+        return;
+      }
+    }
 
     setSubmitting(true);
     const result = await createAppointmentAction({
@@ -200,6 +218,13 @@ export function AppointmentForm({
       durationMin: effectiveDuration,
       totalOverride: totalEdited ? totalValue : null,
       peopleCount: persons.length,
+      people:
+        persons.length > 1
+          ? persons.map((p) => ({
+              name: p.name.trim(),
+              serviceIds: p.serviceIds,
+            }))
+          : undefined,
       notes,
       payment: {
         kind: paymentKind,
@@ -380,7 +405,9 @@ export function AppointmentForm({
                 <span className="text-sm font-medium">Persona {i + 1}</span>
                 <Input
                   className="h-8 flex-1"
-                  placeholder="Nombre (opcional)"
+                  placeholder={
+                    persons.length > 1 ? "Nombre" : "Nombre (opcional)"
+                  }
                   value={p.name}
                   onChange={(e) => setPersonName(p.id, e.target.value)}
                 />

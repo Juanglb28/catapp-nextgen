@@ -113,6 +113,24 @@ export default async function CitaDetailPage({
   );
   const overridden = appointment.totalCop !== computedSubtotal;
 
+  // Línea de servicio por id (precio congelado, D-10), usada para resolver
+  // el desglose por persona (comprobante discriminado, D-38) tanto en la UI
+  // como al armar receiptData/paymentReceipt.
+  const serviceLineById = new Map(
+    appointment.services.map((line) => [line.serviceId, line]),
+  );
+  const peopleBreakdown = appointment.people.map((person) => ({
+    name: person.name,
+    services: person.serviceIds
+      .map((serviceId) => serviceLineById.get(serviceId))
+      .filter((line): line is NonNullable<typeof line> => line !== undefined)
+      .map((line) => ({
+        name: line.service.name,
+        quantity: line.quantity,
+        amount: formatCOP(line.priceCop * BigInt(line.quantity)),
+      })),
+  }));
+
   // Opciones del sheet de servicios: catálogo activo + los de la cita (precio
   // congelado) que ya no estén activos.
   const optionMap = new Map<
@@ -214,6 +232,7 @@ export default async function CitaDetailPage({
               quantity: l.quantity,
               amount: formatCOP(l.priceCop * BigInt(l.quantity)),
             })),
+            people: peopleBreakdown.length > 0 ? peopleBreakdown : undefined,
             totalLabel: formatCOP(netTotal),
             bonusLabel:
               appointment.bonusDiscountCop > 0n
@@ -257,6 +276,7 @@ export default async function CitaDetailPage({
             quantity: l.quantity,
             amount: formatCOP(l.priceCop * BigInt(l.quantity)),
           })),
+          people: peopleBreakdown.length > 0 ? peopleBreakdown : undefined,
           totalLabel: formatCOP(netTotal),
           bonusLabel:
             appointment.bonusDiscountCop > 0n
@@ -472,6 +492,38 @@ export default async function CitaDetailPage({
           ))}
         </ul>
       </section>
+
+      {/* Personas atendidas (comprobante discriminado, D-38). Solo existe
+          cuando la cita se creó con más de 1 persona y se guardaron los
+          nombres; citas viejas sin este dato simplemente no muestran la
+          sección. No es editable aquí — ver comentario en repository.ts
+          sobre por qué se borra al editar servicios. */}
+      {peopleBreakdown.length > 0 ? (
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium">Personas atendidas</h2>
+          <ul className="space-y-2">
+            {peopleBreakdown.map((person, i) => (
+              <li key={i} className="rounded-lg border p-2">
+                <p className="text-sm font-medium">{person.name}</p>
+                <ul className="space-y-1">
+                  {person.services.map((s, j) => (
+                    <li
+                      key={j}
+                      className="text-muted-foreground flex items-center justify-between text-xs"
+                    >
+                      <span>
+                        {s.name}
+                        {s.quantity > 1 ? ` ×${s.quantity}` : ""}
+                      </span>
+                      <span>{s.amount}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* Totales y pago */}
       <section className="space-y-2 rounded-xl border p-3">

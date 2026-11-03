@@ -179,7 +179,65 @@ export const appointmentChanges = pgTable(
   ],
 );
 
+/**
+ * Personas atendidas en una cita con varias clientas (ítem nuevo: comprobante
+ * discriminado por persona). Solo existen filas aquí cuando se creó la cita
+ * con más de 1 persona (`peopleCount > 1`) desde `appointment-form.tsx`; una
+ * cita de 1 persona no genera registros — el nombre de la clienta ya es la
+ * fuente de verdad y el comprobante se ve igual que antes de este cambio.
+ * Si luego se editan los servicios de la cita (`EditServicesSheet`), estas
+ * filas se borran (ver `editAppointmentAction`): es preferible no mostrar
+ * desglose a mostrar uno desactualizado frente a la lista de servicios real.
+ */
+export const appointmentPeople = pgTable(
+  "appointment_people",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    appointmentId: uuid("appointment_id")
+      .notNull()
+      .references(() => appointments.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    orderIndex: integer("order_index").notNull().default(0),
+  },
+  (t) => [
+    index("appointment_people_appointment_idx").on(
+      t.appointmentId,
+      t.orderIndex,
+    ),
+  ],
+);
+
+/**
+ * Qué servicios recibió cada persona. El precio NO se duplica aquí: se
+ * consulta por `appointmentId` + `serviceId` en `appointment_services`, que ya
+ * tiene el precio congelado (D-10) — así no hay dos fuentes de precio que
+ * puedan desincronizarse.
+ */
+export const appointmentPersonServices = pgTable(
+  "appointment_person_services",
+  {
+    appointmentId: uuid("appointment_id")
+      .notNull()
+      .references(() => appointments.id, { onDelete: "cascade" }),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => appointmentPeople.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id")
+      .notNull()
+      .references(() => services.id),
+    quantity: integer("quantity").notNull().default(1),
+  },
+  (t) => [
+    primaryKey({ columns: [t.personId, t.serviceId] }),
+    index("appointment_person_services_appointment_idx").on(t.appointmentId),
+  ],
+);
+
 export type Appointment = typeof appointments.$inferSelect;
 export type NewAppointment = typeof appointments.$inferInsert;
 export type AppointmentService = typeof appointmentServices.$inferSelect;
 export type AppointmentChange = typeof appointmentChanges.$inferSelect;
+export type AppointmentPerson = typeof appointmentPeople.$inferSelect;
+export type NewAppointmentPerson = typeof appointmentPeople.$inferInsert;
+export type AppointmentPersonService =
+  typeof appointmentPersonServices.$inferSelect;

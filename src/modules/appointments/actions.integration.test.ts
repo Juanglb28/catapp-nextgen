@@ -13,7 +13,7 @@ vi.mock("@/modules/tenancy/context", () => ({ requireTenant: vi.fn() }));
 
 import { requireTenant } from "@/modules/tenancy/context";
 
-import { createAppointmentAction } from "./actions";
+import { createAppointmentAction, editAppointmentAction } from "./actions";
 
 const requireTenantMock = vi.mocked(requireTenant);
 
@@ -159,5 +159,80 @@ describe.runIf(TEST_DB)("createAppointmentAction (integración)", () => {
       clientId: nueva.id,
     });
     expect(result.ok).toBe(true);
+  });
+
+  // Comprobante discriminado por persona (D-38).
+  describe("desglose por persona", () => {
+    it("guarda el nombre y los servicios de cada persona cuando hay más de una", async () => {
+      const result = await createAppointmentAction({
+        ...basePayload(),
+        peopleCount: 2,
+        people: [
+          { name: "Ana", serviceIds: [svc1] },
+          { name: "María", serviceIds: [svc2] },
+        ],
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const repo = await import("./repository");
+      const appt = await repo.getAppointment(tenantId, result.id);
+      expect(appt?.people).toHaveLength(2);
+      expect(appt?.people.map((p) => p.name)).toEqual(["Ana", "María"]);
+      expect(appt?.people.find((p) => p.name === "Ana")?.serviceIds).toEqual([
+        svc1,
+      ]);
+      expect(appt?.people.find((p) => p.name === "María")?.serviceIds).toEqual([
+        svc2,
+      ]);
+    });
+
+    it("no guarda nada cuando solo hay una persona (el nombre de la clienta ya es la fuente de verdad)", async () => {
+      const result = await createAppointmentAction(basePayload());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const repo = await import("./repository");
+      const appt = await repo.getAppointment(tenantId, result.id);
+      expect(appt?.people).toEqual([]);
+    });
+
+    it("rechaza si falta el nombre de alguna persona cuando hay más de una", async () => {
+      const result = await createAppointmentAction({
+        ...basePayload(),
+        peopleCount: 2,
+        people: [
+          { name: "Ana", serviceIds: [svc1] },
+          { name: "", serviceIds: [svc2] },
+        ],
+      });
+      expect(result.ok).toBe(false);
+    });
+
+    it("borra el desglose por persona al editar los servicios de la cita", async () => {
+      const created = await createAppointmentAction({
+        ...basePayload(),
+        peopleCount: 2,
+        people: [
+          { name: "Ana", serviceIds: [svc1] },
+          { name: "María", serviceIds: [svc2] },
+        ],
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      const repo = await import("./repository");
+      expect(
+        (await repo.getAppointment(tenantId, created.id))?.people,
+      ).toHaveLength(2);
+
+      const edited = await editAppointmentAction(created.id, {
+        services: [{ serviceId: svc1, quantity: 2 }],
+      });
+      expect(edited.ok).toBe(true);
+
+      const appt = await repo.getAppointment(tenantId, created.id);
+      expect(appt?.people).toEqual([]);
+    });
   });
 });
