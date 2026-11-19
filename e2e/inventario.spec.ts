@@ -24,7 +24,10 @@ test.describe("inventario", () => {
     await page.getByLabel(/stock inicial/i).fill("10");
 
     // Crear.
-    await page.getByRole("button", { name: /crear producto/i }).click();
+    const crear = page.getByRole("button", { name: /crear producto/i });
+    await expect(crear).toBeVisible();
+    await expect(crear).toBeEnabled();
+    await crear.click();
 
     // Toast de éxito.
     await expect(page.getByText(/producto creado/i)).toBeVisible({
@@ -39,7 +42,7 @@ test.describe("inventario", () => {
     await page.goto("/inventario");
 
     // Esperar a que la lista se cargue.
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByPlaceholder(/buscar producto/i)).toBeVisible();
 
     // Buscar el producto creado antes.
     await page.getByPlaceholder(/buscar producto/i).fill(productName);
@@ -68,7 +71,7 @@ test.describe("inventario", () => {
 
   test("registrar salida de stock con botón −", async ({ page }) => {
     await page.goto("/inventario");
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByPlaceholder(/buscar producto/i)).toBeVisible();
 
     await page.getByPlaceholder(/buscar producto/i).fill(productName);
     await expect(page.getByText(productName)).toBeVisible({ timeout: 5_000 });
@@ -97,14 +100,16 @@ test.describe("inventario", () => {
     page,
   }) => {
     await page.goto("/inventario");
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByPlaceholder(/buscar producto/i)).toBeVisible();
 
     await page.getByPlaceholder(/buscar producto/i).fill(productName);
     await expect(page.getByText(productName)).toBeVisible({ timeout: 5_000 });
 
-    // Navegar al detalle (link sobre el nombre).
-    await page.getByText(productName).click();
-    await expect(page).toHaveURL(/\/inventario\/[0-9a-f-]{36}/);
+    // Navegar al detalle: el enlace del producto en la lista.
+    await page.getByRole("link", { name: new RegExp(productName) }).click();
+    await expect(page).toHaveURL(/\/inventario\/[0-9a-f-]{36}/, {
+      timeout: 10_000,
+    });
 
     // El historial de movimientos debe estar visible.
     // La página muestra "Entrada", "Salida" en el historial.
