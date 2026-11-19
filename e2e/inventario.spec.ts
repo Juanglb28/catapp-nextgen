@@ -42,7 +42,7 @@ test.describe("inventario", () => {
     await page.goto("/inventario");
 
     // Esperar a que la lista se cargue.
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByPlaceholder(/buscar producto/i)).toBeVisible();
 
     // Buscar el producto creado antes.
     await page.getByPlaceholder(/buscar producto/i).fill(productName);
@@ -71,7 +71,7 @@ test.describe("inventario", () => {
 
   test("registrar salida de stock con botón −", async ({ page }) => {
     await page.goto("/inventario");
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByPlaceholder(/buscar producto/i)).toBeVisible();
 
     await page.getByPlaceholder(/buscar producto/i).fill(productName);
     await expect(page.getByText(productName)).toBeVisible({ timeout: 5_000 });
@@ -100,7 +100,7 @@ test.describe("inventario", () => {
     page,
   }) => {
     await page.goto("/inventario");
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByPlaceholder(/buscar producto/i)).toBeVisible();
 
     await page.getByPlaceholder(/buscar producto/i).fill(productName);
     await expect(page.getByText(productName)).toBeVisible({ timeout: 5_000 });
