@@ -27,7 +27,7 @@ setup("autenticar usuario de prueba", async ({ page }) => {
   await page.goto("/login");
 
   await page.getByLabel(/correo/i).fill(email);
-  await page.getByLabel(/contraseña/i).fill(password);
+  await page.getByLabel("Contraseña", { exact: true }).fill(password);
   await page.getByRole("button", { name: /iniciar sesión/i }).click();
 
   // Esperar a que llegue a la app (redirige a /citas tras login exitoso).
