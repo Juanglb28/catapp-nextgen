@@ -24,7 +24,10 @@ test.describe("inventario", () => {
     await page.getByLabel(/stock inicial/i).fill("10");
 
     // Crear.
-    await page.getByRole("button", { name: /crear producto/i }).click();
+    const crear = page.getByRole("button", { name: /crear producto/i });
+    await expect(crear).toBeVisible();
+    await expect(crear).toBeEnabled();
+    await crear.click();
 
     // Toast de éxito.
     await expect(page.getByText(/producto creado/i)).toBeVisible({
