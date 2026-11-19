@@ -10,22 +10,25 @@ allowBuilds:
   unrs-resolver: true
 
 overrides:
-  vite: ">=6.4.3"
-  # sharp/postcss: Next.js 15.5.22 sigue trayendo internamente versiones con
-  # vulnerabilidades altas ya parchadas río arriba (libvips en sharp <0.35.0;
-  # lectura arbitraria de archivos / path traversal en postcss <=8.5.17).
-  # Forzadas aquí porque Next.js aún no bumpeó sus propias dependencias.
-  sharp: ">=0.35.0"
-  postcss: ">=8.5.18"
-
-# GHSA-mh99-v99m-4gvg (brace-expansion DoS, 2026-07-29): la única vía real
-# hacia producción es @sentry/nextjs > @sentry/node > minimatch@3 > brace-expansion.
-# Forzar brace-expansion a la versión parchada (>=5.0.8) ROMPE @eslint/config-array
-# (usa minimatch@3.1.5, que depende de la API vieja de brace-expansion@1.x;
-# TypeError: expand is not a function). Riesgo real bajo: minimatch/brace-expansion
-# en el SDK de Sentry solo hace pattern-matching interno de config
-# (ignoreErrors/denyUrls), no procesa input de usuario. Revisar cuando
-# @eslint/config-array o better-auth>next>@sentry/node bumpeen su propio minimatch.
-auditConfig:
-  ignoreGhsas:
-    - GHSA-mh99-v99m-4gvg
+  vite: ">=8.1.6 <9"
+  # sharp/postcss: versiones forzadas porque Next.js y otras dependencias aún
+  # traen versiones con vulnerabilidades altas ya parchadas río arriba
+  # (libheif/librsvg en sharp <0.35.5; lectura arbitraria de archivos /
+  # path traversal en postcss <=8.5.17).
+  sharp: ">=0.35.5 <0.36.0"
+  postcss: ">=8.5.18 <9"
+  # Parches de auditoría (2026-11): transitivas de build, dev y Sentry/Serwist.
+  undici: ">=7.30.1 <8"
+  fast-uri: ">=3.1.7 <4"
+  js-yaml: ">=4.3.2 <5"
+  nanoid: ">=3.3.18 <4"
+  source-map-js: ">=1.2.2 <2"
+  browserslist: ">=4.28.7 <5"
+  tinypool: ">=2.1.2 <3"
+  zod: ">=4.6.6 <5"
+  # brace-expansion: override por ruta y por major. Un override global a 5.x
+  # rompe @eslint/eslintrc (minimatch@3 necesita la API 1.x).
+  "minimatch@3>brace-expansion": ">=1.1.20 <2"
+  "minimatch@8>brace-expansion": ">=2.1.6 <3"
+  "minimatch@9>brace-expansion": ">=2.1.6 <3"
+  "minimatch@10>brace-expansion": ">=5.0.13 <6"
